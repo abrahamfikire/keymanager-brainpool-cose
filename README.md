@@ -1,64 +1,74 @@
-[![Build Status](https://travis-ci.com/mosip/commons.svg?branch=master)](https://travis-ci.com/mosip/commons)
+# MOSIP Kernel Keymanager Service
 
-[![Join the chat at https://gitter.im/mosip-community/Commons-Kernel](https://badges.gitter.im/mosip-community/Commons-Kernel.svg)](https://gitter.im/mosip-community/Commons-Kernel?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+This is a Java implementation of MOSIP's kernel-keymanager-service with enhanced CBOR/COSE signing and verification capabilities for MOSIP QR code specifications.
 
-# mosip-platform
-This repository contains the source code of the Modular Open Source Identity Platform. To know more about MOSIP, its architecture, external integrations, releases, etc., please check the [Platform Documentation](https://github.com/mosip/mosip-docs/wiki)
+## Features
 
-### Introduction
-MOSIP consists of the following modules - 
-1. `Kernel` - The Kernel module provides a bedrock to build and run services by providing several significant necessary technical functions. It contains common functionalities which are used by more than one module.
-2. `Pre-Registration` - Pre-Registration module enables individuals to book appointments in a registration centre, by providing basic demographic details.
-3. `Registration` - Registration module provides a desktop application for Registration Officers/Supervisors to register an individual in MOSIP, by capturing their demographic and biometric details. 
-4. `Registration Processor` - Registration Processor validates and processes an individual's data received from the registration module, and eventually generates a UIN (Unique Identification Number) for the individual.
-5. `ID Repository` - The ID Repository module acts as a repository of individual's data along with UIN mapped.
-6. `ID Authentication` - ID Authentication module enables a Partner to authenticate an individual.
+- **CBOR/COSE Signing**: Support for signing CBOR-encoded data using COSE_Sign1
+- **Signature Verification**: Verification of COSE_Sign1 signatures
+- **Multiple Curve Support**: Support for various elliptic curves including Brainpool and SECP256K1
+- **HSM Integration**: Integration with Hardware Security Modules
+- **REST API**: RESTful endpoints for signing and verification operations
 
-### Build
-The following commands should be run in the parent project to build all the modules - 
-`mvn clean install`
-The above command can be used to build individual modules when run in their respective folders
+## Key Components
 
-### Deploy
-The following command should be executed to run any service locally in specific profile and local configurations - 
-`java -Dspring.profiles.active=<profile> -jar <jar-name>.jar`
+### COSESign1Util
+Utility class for CBOR/COSE operations:
+- `sign()`: Signs CBOR payloads using COSE_Sign1
+- `verify()`: Verifies COSE_Sign1 signatures
+- `jsonToBytes()`: Converts JSON to CBOR bytes
 
-The following command should be executed to run any service locally in specific profile and `remote` configurations - 
-`java -Dspring.profiles.active=<profile> -Dspring.cloud.config.uri=<config-url> -Dspring.cloud.config.label=<config-label> -jar <jar-name>.jar`
+### SignatureServiceImpl
+Main service implementation with methods:
+- `coseSign1()`: Creates COSE_Sign1 signatures
+- `coseVerify1()`: Verifies COSE_Sign1 signatures
+- `jwtSign()`: JWT signing capabilities
+- `jwtVerify()`: JWT verification
 
-The following command should be executed to run a docker image - 
-`docker run -it -p <host-port>:<container-port> -e active_profile_env={profile} -e spring_config_label_env= {branch} -e spring_config_url_env={config_server_url} <docker-registry-IP:docker-registry-port/<dcker-image>`
+## API Endpoints
 
-#### Run as Developer
-For running services in a native environment developer has to run some core components
-[Instruction to follow for running core components](./StartKernelCoreComponents_instructions.md) 
-### Configurations
-All the configurations used by the codebase in `mosip-platform` is present in [mosip-config](https://github.com/mosip/mosip-config) repository.
+- `POST /signature/cose/sign1`: Sign CBOR data with COSE_Sign1
+- `POST /signature/cose/verify1`: Verify COSE_Sign1 signatures
 
-### Functional Test-cases
-Functional tests run against the codebase in `mosip-platform` is present in [mosip-functional-tests](https://github.com/mosip/mosip-functional-tests) repository.
+## Dependencies
 
-### Documentation
-Relevant documents to get started with MOSIP can be found in [mosip-docs](https://github.com/mosip/mosip-docs) repository. 
-In order to get started, please refer to the [Getting-Started](https://github.com/mosip/mosip-docs/wiki/Getting-Started) guide.
+- COSE-JAVA library for CBOR/COSE operations
+- BouncyCastle for cryptographic operations
+- Spring Boot for REST API
+- MOSIP kernel components
 
-### Infra
-Automated scripts to build and deploy MOSIP modules are present in [mosip-infra](https://github.com/mosip/mosip-infra) repository.
+## Usage
 
+### Signing CBOR Data
+```bash
+curl -X POST http://localhost:8080/signature/cose/sign1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataToSign": "base64EncodedJsonData",
+    "applicationId": "KERNEL",
+    "referenceId": "SIGN"
+  }'
+```
 
----
+### Verifying COSE_Sign1
+```bash
+curl -X POST http://localhost:8080/signature/cose/verify1 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "coseSign1Data": "base64EncodedCoseSign1",
+    "actualData": "base64EncodedOriginalData",
+    "applicationId": "KERNEL",
+    "referenceId": "SIGN"
+  }'
+```
 
-### Contribute
-You can contribute to MOSIP! 
+## Configuration
 
-We want to engage constructively with the community.  If you find a **vulnerability** or issue, please file a bug with the respective repository.  We welcome pull requests with fixes too.  Please see the [Contributor Guide](https://github.com/mosip/mosip-docs/wiki/Contributor-Guide) on how to file bugs, contribute code, and more.
+The service supports various configuration options through application properties:
+- Key management settings
+- Cryptographic algorithm preferences
+- HSM provider configurations
 
-### License
-This project is licensed under the terms of [Mozilla Public License 2.0](https://github.com/mosip/mosip-platform/blob/master/LICENSE)
+## License
 
-### Communication
-Join the [developer mailing list](https://groups.io/g/mosip-dev)
-
-## Comprehensive review 
-During comprehensive review, inline documentation of kernel will be changed. Look for Jira issue MOS-31009
-
+This project is part of the MOSIP (Modular Open Source Identity Platform) ecosystem.

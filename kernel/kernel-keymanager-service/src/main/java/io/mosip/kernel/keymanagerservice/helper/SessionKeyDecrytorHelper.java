@@ -29,7 +29,7 @@ import io.mosip.kernel.core.crypto.exception.NullDataException;
 import io.mosip.kernel.core.crypto.exception.NullKeyException;
 import io.mosip.kernel.core.crypto.exception.NullMethodException;
 import io.mosip.kernel.core.crypto.spi.CryptoCoreSpec;
-import io.mosip.kernel.core.keymanager.spi.KeyStore;
+import io.mosip.kernel.core.keymanager.spi.ECKeyStore;
 import io.mosip.kernel.core.logger.spi.Logger;
 import io.mosip.kernel.core.util.CryptoUtil;
 import io.mosip.kernel.core.util.DateUtils;
@@ -90,8 +90,11 @@ public class SessionKeyDecrytorHelper {
 	/**
 	 * Keystore instance to handles and store cryptographic keys.
 	 */
+		@Autowired
+	private ECKeyStore keyStore;
+
 	@Autowired
-	private KeyStore keyStore;
+	private PrivateKeyDecryptorHelper privateKeyDecryptorHelper;
 
 	private Map<String, io.mosip.kernel.keymanagerservice.entity.KeyStore> cacheKeyStore = new ConcurrentHashMap<>();
 
@@ -137,29 +140,31 @@ public class SessionKeyDecrytorHelper {
 		byte[] encryptedSymmetricKey = Arrays.copyOfRange(encryptedData, CryptomanagerConstant.THUMBPRINT_LENGTH, 
 									encryptedData.length);
 		String certThumbprintHex = Hex.toHexString(certThumbprint).toUpperCase();
-		io.mosip.kernel.keymanagerservice.entity.KeyStore dbKeyStore = cacheKeyStore.getOrDefault(certThumbprintHex, null);
+		// io.mosip.kernel.keymanagerservice.entity.KeyStore dbKeyStore = cacheKeyStore.getOrDefault(certThumbprintHex, null);
 
-		String appIdRefIdKey = applicationId + KeymanagerConstant.HYPHEN + referenceId;
-		String compMasterKeyRefId = applicationId + KeymanagerConstant.HYPHEN + KeymanagerConstant.COMPONENT_MASTER_KEY_DUMMY_REF; 
-		if(Objects.isNull(dbKeyStore)) {
-			dbKeyStore = dbHelper.getKeyAlias(certThumbprintHex, appIdRefIdKey);
-			cacheKeyStore.put(certThumbprintHex, dbKeyStore);
-			// Added condition to handle issue related to decryption error with Master key.
-			if (Objects.isNull(dbKeyStore.getPrivateKey())) {
-				cacheReferenceIds.put(certThumbprintHex, compMasterKeyRefId);
-			} else {
-				cacheReferenceIds.put(certThumbprintHex, appIdRefIdKey);
-			}
-		}
+		// String appIdRefIdKey = applicationId + KeymanagerConstant.HYPHEN + referenceId;
+		// String compMasterKeyRefId = applicationId + KeymanagerConstant.HYPHEN + KeymanagerConstant.COMPONENT_MASTER_KEY_DUMMY_REF; 
+		// if(Objects.isNull(dbKeyStore)) {
+		// 	dbKeyStore = dbHelper.getKeyAlias(certThumbprintHex, appIdRefIdKey);
+		// 	cacheKeyStore.put(certThumbprintHex, dbKeyStore);
+		// 	// Added condition to handle issue related to decryption error with Master key.
+		// 	if (Objects.isNull(dbKeyStore.getPrivateKey())) {
+		// 		cacheReferenceIds.put(certThumbprintHex, compMasterKeyRefId);
+		// 	} else {
+		// 		cacheReferenceIds.put(certThumbprintHex, appIdRefIdKey);
+		// 	}
+		// }
 
-		String cachedRefId = cacheReferenceIds.getOrDefault(certThumbprintHex, null);
-		if (!appIdRefIdKey.equals(cachedRefId) && !compMasterKeyRefId.equals(cachedRefId)){
-            LOGGER.error(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
-                "Application Id & Reference ID not matching with the input thumbprint value(decrypt).");
-            throw new KeymanagerServiceException(KeymanagerErrorConstant.APP_ID_REFERENCE_ID_NOT_MATCHING.getErrorCode(),
-                KeymanagerErrorConstant.APP_ID_REFERENCE_ID_NOT_MATCHING.getErrorMessage());
-        }
+		// String cachedRefId = cacheReferenceIds.getOrDefault(certThumbprintHex, null);
+		// if (!appIdRefIdKey.equals(cachedRefId) && !compMasterKeyRefId.equals(cachedRefId)){
+        //     LOGGER.error(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
+        //         "Application Id & Reference ID not matching with the input thumbprint value(decrypt).");
+        //     throw new KeymanagerServiceException(KeymanagerErrorConstant.APP_ID_REFERENCE_ID_NOT_MATCHING.getErrorCode(),
+        //         KeymanagerErrorConstant.APP_ID_REFERENCE_ID_NOT_MATCHING.getErrorMessage());
+        // }
 
+		io.mosip.kernel.keymanagerservice.entity.KeyStore dbKeyStore = privateKeyDecryptorHelper.getDBKeyStoreData(certThumbprintHex, 
+																		applicationId, referenceId);
 		SymmetricKeyResponseDto keyResponseDto = new SymmetricKeyResponseDto();
 		byte[] decryptedSymmetricKey = decryptSessionKeyWithCertificateThumbprint(dbKeyStore, encryptedSymmetricKey, referenceId);
 		keyResponseDto.setSymmetricKey(CryptoUtil.encodeBase64(decryptedSymmetricKey));

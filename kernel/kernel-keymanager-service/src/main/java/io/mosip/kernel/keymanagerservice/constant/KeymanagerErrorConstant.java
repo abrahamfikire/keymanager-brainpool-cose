@@ -11,7 +11,7 @@ public enum KeymanagerErrorConstant {
 
 	VALIDITY_CHECK_FAIL("KER-KMS-001", "Certificate is not valid"),
 
-	APPLICATIONID_NOT_VALID("KER-KMS-002", "ApplicationId not found in Key Policy"),
+	APPLICATIONID_NOT_VALID("KER-KMS-002", "ApplicationId not found in Key Policy. Key/CSR generation not allowed."),
 
 	NO_UNIQUE_ALIAS("KER-KMS-003", "No unique alias is found"),
 
@@ -37,9 +37,9 @@ public enum KeymanagerErrorConstant {
 
 	KEY_NOT_MATCHING("KER-KMS-014", "Certificate Key Not Matching with stored Key."),
 
-	UPLOAD_NOT_ALLOWED("KER-KMS-015", "Upload of certificate will not be allowed to update other domain certificate."),
+	UPLOAD_NOT_ALLOWED("KER-KMS-015", "Upload of certificate will not be allowed to update other domain certificate.(Refer Logs for error reason)"),
 
-	GENERATION_NOT_ALLOWED("KER-KMS-016", "Not allowed to generate new key pair for other domains."),
+	GENERATION_NOT_ALLOWED("KER-KMS-016", "Not allowed to generate new key pair for other domains or not allowed to generate base key. (%s)"),
 
 	CERTIFICATE_NOT_FOUND("KER-KMS-017", "Certificate Not found in keystore table."),
 
@@ -49,13 +49,31 @@ public enum KeymanagerErrorConstant {
 
 	NOT_VALID_SIGNATURE_KEY("KER-KMS-020", "Signing operation not allowed for the provided application id & reference id."),
 
+	REVOKE_NOT_ALLOWED("KER-KMS-021", "Key Revocation not allowed."),
+
+	GENERATION_CSR_ALLOWED("KER-KMS-022", "CSR Generation not allowed for the provided App Id & Ref Id."),
+
 	MORE_THAN_ONE_KEY_FOUND("KER-KMS-023", "More than one key alias found for the provided thumbprint."),
 
 	APP_ID_REFERENCE_ID_NOT_MATCHING("KER-KMS-024", "Application Id & Reference Id not matching with the input thumbprint."),
 
-	INTERNAL_SERVER_ERROR("KER-KMS-500", "Internal server error");
+	KEY_NOT_FOUND_BY_THUMBPRINT("KER-KMS-025", "Key Not found for the thumbprint prepended in encrypted data."),
 
-	/**
+	KEY_GEN_NOT_ALLOWED_FOR_APPID("KER-KMS-026", "Key Generation Not allowed for the input application id."),
+
+	UPLOAD_DUPLICATE_CERT_NOT_ALLOWED("KER-KMS-027", "Upload of certificate will not be allowed, Current certificate thumbprint in DB matching with input certificate thumbprint."),
+
+	MISSING_PARAMETER_VALUE("KER-KMS-028", "Missing Input Parameter - "),
+
+	NOT_SUPPORTED_CURVE_VALUE("KER-KMS-029", "Unsupported EC Curve - "),
+
+	EC_SIGN_REFERENCE_ID_NOT_SUPPORTED("KER-KMS-030", "EC Sign Reference Id Not Supported for the Application ID."),
+
+	INTERNAL_SERVER_ERROR("KER-KMS-500", "Internal server error"),
+
+	INVALID_FORMAT_ERROR("KER-KMS-XXX", "Unsupported output format for the signature");
+
+    /**
 	 * The error code.
 	 */
 	private final String errorCode;
@@ -69,7 +87,7 @@ public enum KeymanagerErrorConstant {
 	 * @param errorCode    The error code to be set.
 	 * @param errorMessage The error message to be set.
 	 */
-	private KeymanagerErrorConstant(String errorCode, String errorMessage) {
+    KeymanagerErrorConstant(String errorCode, String errorMessage) {
 		this.errorCode = errorCode;
 		this.errorMessage = errorMessage;
 	}

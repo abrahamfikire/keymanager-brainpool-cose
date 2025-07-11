@@ -186,6 +186,11 @@ public class KeysGenerator {
         requestDto.setLocation(location);
         requestDto.setState(state);
         requestDto.setCountry(country);
+        
+        if(Arrays.stream(KeyReferenceIdConsts.values()).anyMatch((rId) -> rId.name().equals(refId))) {
+            keymanagerService.generateECSignKey(DUMMY_RESP_TYPE, requestDto);
+            return;
+        }
         keymanagerService.generateMasterKey(DUMMY_RESP_TYPE, requestDto);
     }
 

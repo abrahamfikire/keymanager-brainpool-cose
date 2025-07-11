@@ -3,6 +3,7 @@ package io.mosip.kernel.partnercertservice.controller;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,8 @@ import io.mosip.kernel.partnercertservice.dto.PartnerCertDownloadRequestDto;
 import io.mosip.kernel.partnercertservice.dto.PartnerCertDownloadResponeDto;
 import io.mosip.kernel.partnercertservice.dto.PartnerCertificateRequestDto;
 import io.mosip.kernel.partnercertservice.dto.PartnerCertificateResponseDto;
+import io.mosip.kernel.partnercertservice.dto.PartnerSignedCertDownloadResponseDto;
+
 import io.mosip.kernel.partnercertservice.service.spi.PartnerCertificateManagerService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiParam;
@@ -32,7 +35,7 @@ import io.swagger.annotations.ApiParam;
  *
  * @since 1.1.2
  */
-
+@SuppressWarnings("java:S5122") // Need CrossOrigin access for all the APIs, added to ignore in sonarCloud Security hotspots.
 @CrossOrigin
 @RestController
 @Api(value = "Operation related to partner certificate management.", tags = { "partnercertmanager" })
@@ -53,6 +56,8 @@ public class PartnerCertManagerController {
 		// @PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL',
 		// 'PMS_ADMIN')")
 	@ResponseFilter
+	//	@PreAuthorize("hasAnyRole(@keyManAuthRoles.getPostuploadcacertificate())")
+
 	@PostMapping(value = "/uploadCACertificate", produces = "application/json")
 	public ResponseWrapper<CACertificateResponseDto> uploadCACertificate(
 			@ApiParam("Upload CA/Sub-CA certificates.") @RequestBody @Valid RequestWrapper<CACertificateRequestDto> caCertRequestDto) {
@@ -71,6 +76,8 @@ public class PartnerCertManagerController {
 	// @PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL',
 	// 'ID_AUTHENTICATION', 'PMS_USER')")
 	@ResponseFilter
+	//@PreAuthorize("hasAnyRole(@keyManAuthRoles.getPostuploadpartnercertificate())")
+
 	@PostMapping(value = "/uploadPartnerCertificate", produces = "application/json")
 	public ResponseWrapper<PartnerCertificateResponseDto> uploadPartnerCertificate(
 			@ApiParam("Upload Partner Certificates.") @RequestBody @Valid RequestWrapper<PartnerCertificateRequestDto> partnerCertRequestDto) {
@@ -89,6 +96,7 @@ public class PartnerCertManagerController {
 	// @PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL',
 	// 'ID_AUTHENTICATION', 'PMS_USER')")
 	@ResponseFilter
+	//@PreAuthorize("hasAnyRole(@keyManAuthRoles.getGetgetpartnercertificatepartnercertid())")
 	@GetMapping(value = "/getPartnerCertificate/{partnerCertId}")
 	public ResponseWrapper<PartnerCertDownloadResponeDto> getPartnerCertificate(
 			@ApiParam("To download re-signed partner certificate.") @PathVariable("partnerCertId") String partnerCertId) {
@@ -108,12 +116,32 @@ public class PartnerCertManagerController {
 	// @PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL',
 	// 'ID_AUTHENTICATION', 'PMS_USER')")
 	@ResponseFilter
+	//@PreAuthorize("hasAnyRole(@keyManAuthRoles.getPostverifycertificatetrust())")
 	@PostMapping(value = "/verifyCertificateTrust", produces = "application/json")
 	public ResponseWrapper<CertificateTrustResponeDto> verifyCertificateTrust(
 			@ApiParam("Upload Partner Certificates.") @RequestBody @Valid RequestWrapper<CertificateTrustRequestDto> certificateTrustRequestDto) {
 
 		ResponseWrapper<CertificateTrustResponeDto> response = new ResponseWrapper<>();
 		response.setResponse(partnerCertManagerService.verifyCertificateTrust(certificateTrustRequestDto.getRequest()));
+		return response;
+	}
+
+		/**
+	 * To Download Partner CA Signed Certificate & MOSIP CA Signed Certificate.
+	 * 
+	 * @param certDownloadRequestDto {@link PartnerCertDownloadRequestDto} request
+	 * @return {@link PartnerCertDownloadResponeDto} encrypted Data
+	 */
+	
+	@ResponseFilter
+	//@PreAuthorize("hasAnyRole(@keyManAuthRoles.getGetgetpartnersignedcertificatepartnercertid())")
+	@GetMapping(value = "/getPartnerSignedCertificate/{partnerCertId}")
+	public ResponseWrapper<PartnerSignedCertDownloadResponseDto> getPartnerSignedCertificate(
+			@ApiParam("To download CA Signed partner certificate.") @PathVariable("partnerCertId") String partnerCertId) {
+		PartnerCertDownloadRequestDto certDownloadRequestDto = new PartnerCertDownloadRequestDto();
+		certDownloadRequestDto.setPartnerCertId(partnerCertId);
+		ResponseWrapper<PartnerSignedCertDownloadResponseDto> response = new ResponseWrapper<>();
+		response.setResponse(partnerCertManagerService.getPartnerSignedCertificate(certDownloadRequestDto));
 		return response;
 	}
     

@@ -5,27 +5,30 @@ import io.mosip.kernel.clientcrypto.constant.ClientCryptoManagerConstant;
 import io.mosip.kernel.clientcrypto.exception.ClientCryptoException;
 import io.mosip.kernel.clientcrypto.service.spi.ClientCryptoService;
 import io.mosip.kernel.core.crypto.spi.CryptoCoreSpec;
-import io.mosip.kernel.core.exception.ExceptionUtils;
+import io.mosip.kernel.core.keymanager.model.CertificateEntry;
 import io.mosip.kernel.core.logger.spi.Logger;
 import io.mosip.kernel.core.util.CryptoUtil;
+import io.mosip.kernel.core.util.DateUtils;
+import io.mosip.kernel.keymanagerservice.dto.SignatureCertificate;
 import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
-import io.mosip.kernel.zkcryptoservice.constant.ZKCryptoManagerConstants;
+import io.mosip.kernel.keymanagerservice.service.KeymanagerService;
 import org.apache.commons.io.FileUtils;
+import org.springframework.context.ApplicationContext;
 
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
+
 import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.*;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * This is TPM Fallback implementation,
@@ -47,6 +50,9 @@ class LocalClientCryptoServiceImpl implements ClientCryptoService {
 
     private static SecureRandom secureRandom = null;
     protected static CryptoCoreSpec<byte[], byte[], SecretKey, PublicKey, PrivateKey, String> cryptoCore;
+    private ApplicationContext applicationContext;
+    private Boolean useResidentServiceModuleKey;
+    private String residentServiceAppId;
 
 
     /**
@@ -54,7 +60,8 @@ class LocalClientCryptoServiceImpl implements ClientCryptoService {
      * crypto operations.
      * @throws Throwable
      */
-    LocalClientCryptoServiceImpl(@NotNull CryptoCoreSpec<byte[], byte[], SecretKey, PublicKey, PrivateKey, String> cryptoCoreImpl)
+    LocalClientCryptoServiceImpl(@NotNull CryptoCoreSpec<byte[], byte[], SecretKey, PublicKey, PrivateKey, String> cryptoCoreImpl, 
+            @NotNull ApplicationContext applicationContext, Boolean useResidentServiceModuleKey, String residentServiceAppId)
             throws  Throwable {
         LOGGER.info(ClientCryptoManagerConstant.SESSIONID, ClientCryptoManagerConstant.NON_TPM,
                 ClientCryptoManagerConstant.EMPTY, "Getting the instance of NON_TPM Security");
@@ -82,6 +89,9 @@ class LocalClientCryptoServiceImpl implements ClientCryptoService {
 
         //set cryptoCore
         cryptoCore = cryptoCoreImpl;
+        this.applicationContext = applicationContext;
+        this.useResidentServiceModuleKey = useResidentServiceModuleKey;
+        this.residentServiceAppId = residentServiceAppId;
     }
 
     @Override
@@ -264,6 +274,9 @@ class LocalClientCryptoServiceImpl implements ClientCryptoService {
     }
 
     private PrivateKey getPrivateKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        if(useResidentServiceModuleKey)
+            return getResidentCertificateEntry().getPrivateKey();
+
         byte[] key = Files.readAllBytes(Paths.get(getKeysDirPath() + File.separator + PRIVATE_KEY));
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(key);
         KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
@@ -271,13 +284,21 @@ class LocalClientCryptoServiceImpl implements ClientCryptoService {
     }
 
     private PublicKey getPublicKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        if(useResidentServiceModuleKey)
+            return getResidentCertificateEntry().getChain()[0].getPublicKey();
+
         byte[] key = Files.readAllBytes(Paths.get(getKeysDirPath() + File.separator + PUBLIC_KEY));
         X509EncodedKeySpec keySpec = new X509EncodedKeySpec(key);
         KeyFactory kf = KeyFactory.getInstance(ALGORITHM);
         return kf.generatePublic(keySpec);
     }
 
-
+    private CertificateEntry<X509Certificate, PrivateKey> getResidentCertificateEntry() {
+        SignatureCertificate certificateResponse = applicationContext.getBean(KeymanagerService.class)
+            .getSignatureCertificate(residentServiceAppId, Optional.empty(), 
+                DateUtils.getUTCCurrentDateTimeString());
+        return certificateResponse.getCertificateEntry();
+    }
 
     private void createReadMe(PublicKey publicKey) throws IOException {
         StringBuilder builder = new StringBuilder();
@@ -285,7 +306,7 @@ class LocalClientCryptoServiceImpl implements ClientCryptoService {
         builder.append(InetAddress.getLocalHost().getHostName().toLowerCase());
         builder.append("\r\n");
         builder.append("PublicKey: ");
-        builder.append(CryptoUtil.encodeBase64String(publicKey.getEncoded()));
+        builder.append(CryptoUtil.encodeBase64(publicKey.getEncoded()));
         builder.append("\r\n");
         builder.append("KeyIndex: ");
         builder.append(CryptoUtil.computeFingerPrint(publicKey.getEncoded(), null).toLowerCase());

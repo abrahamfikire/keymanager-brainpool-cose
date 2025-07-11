@@ -1,9 +1,10 @@
 package io.mosip.kernel.partnercertservice.util;
-
+import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SignatureException;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
@@ -12,8 +13,10 @@ import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
-
+import java.util.List;
 import javax.security.auth.x500.X500Principal;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -22,9 +25,16 @@ import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.bouncycastle.cert.jcajce.JcaCertStore;
+import org.bouncycastle.cms.CMSAbsentContent;
+import org.bouncycastle.cms.CMSException;
+import org.bouncycastle.cms.CMSSignedData;
+import org.bouncycastle.cms.CMSSignedDataGenerator;
+import org.bouncycastle.cms.CMSTypedData;
 
 import io.mosip.kernel.core.keymanager.model.CertificateParameters;
 import io.mosip.kernel.core.logger.spi.Logger;
+import io.mosip.kernel.core.util.CryptoUtil;
 import io.mosip.kernel.core.util.DateUtils;
 import io.mosip.kernel.keymanagerservice.entity.CACertificateStore;
 import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
@@ -195,4 +205,37 @@ public class PartnerCertificateManagerUtil {
         }
         return IETFUtils.valueToString((rdns[0]).getFirst().getValue());
     }
+        public static String buildP7BCertificateChain(List<? extends Certificate> certList, X509Certificate resignedCert, 
+                    String partnerDomain, boolean resignFTMDomainCerts, X509Certificate rootCert, X509Certificate pmsCert) {
+        
+        if (partnerDomain.toUpperCase().equals(PartnerCertManagerConstants.FTM_PARTNER_DOMAIN) && !resignFTMDomainCerts) {
+            return buildCertChain(certList.toArray(new Certificate[0]));
+        }
+        
+        List<Certificate> chain = new ArrayList<>();
+        chain.add(resignedCert);
+        chain.add(pmsCert);
+        chain.add(rootCert);
+        return buildCertChain(chain.toArray(new Certificate[0]));
+    }
+
+    private static String buildCertChain(Certificate[] chain) {
+        
+        try {
+            CMSSignedDataGenerator generator = new CMSSignedDataGenerator();
+            JcaCertStore jcaStore = new JcaCertStore(Arrays.asList(chain));
+            generator.addCertificates(jcaStore);
+
+            CMSTypedData cmsTypedData = new CMSAbsentContent();
+            CMSSignedData cmsSignedData = generator.generate(cmsTypedData);
+            return CryptoUtil.encodeBase64(cmsSignedData.getEncoded());
+        } catch(CertificateEncodingException | CMSException | IOException e) {
+            LOGGER.error(PartnerCertManagerConstants.SESSIONID, PartnerCertManagerConstants.UPLOAD_PARTNER_CERT,
+                    PartnerCertManagerConstants.PCM_UTIL, "Error generating p7b certificates chain.");
+            throw new PartnerCertManagerException(PartnerCertManagerErrorConstants.CERTIFICATE_THUMBPRINT_ERROR.getErrorCode(),
+                    PartnerCertManagerErrorConstants.CERTIFICATE_THUMBPRINT_ERROR.getErrorMessage(), e);
+        }
+    }
+    
+    
 }

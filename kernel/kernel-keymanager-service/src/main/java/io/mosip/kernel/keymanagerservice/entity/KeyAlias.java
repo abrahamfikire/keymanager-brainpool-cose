@@ -69,4 +69,10 @@ public class KeyAlias extends BaseEntity {
 	 */
 	@Column(name = "cert_thumbprint", length = 128)
 	private String certThumbprint;
+	
+	/**
+	 * The Key Unique Identifier
+	 */
+	@Column(name = "uni_ident", length = 32)
+	private String uniqueIdentifier;
 }

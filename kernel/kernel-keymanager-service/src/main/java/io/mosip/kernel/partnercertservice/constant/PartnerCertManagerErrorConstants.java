@@ -4,7 +4,7 @@ package io.mosip.kernel.partnercertservice.constant;
  * This ENUM provides all the constant identified for PartnerCertManager errors.
  * 
  * @author Mahammed Taheer
- * @version 1.1.5.3
+ * @version 1.2.0-SNAPSHOT
  *
  */
 public enum PartnerCertManagerErrorConstants {
@@ -36,6 +36,10 @@ public enum PartnerCertManagerErrorConstants {
 	CERT_KEY_NOT_ALLOWED("KER-PCM-013", "Partner Certificate Key Size is less than allowed size."),
 
 	CERT_SIGNATURE_ALGO_NOT_ALLOWED("KER-PCM-014", "Partner Certificate Signature algorithm not supported."),
+
+	SELF_SIGNED_CERT_NOT_ALLOWED("KER-PCM-015", "Self Signed Certificate not allowed as partner."),
+
+	SIGN_CERT_NOT_ALLOWED("KER-PCM-016", "Sign Certificate not allowed for the authenticated token."),
     ;
 
 	/**

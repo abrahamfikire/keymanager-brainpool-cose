@@ -26,7 +26,7 @@ public class ClientCryptoManagerServiceImpl implements ClientCryptoManagerServic
     @Override
     public TpmSignResponseDto csSign(TpmSignRequestDto tpmSignRequestDto) {
         byte[] signedData = clientCryptoFacade.getClientSecurity().signData(
-                CryptoUtil.decodeBase64(tpmSignRequestDto.getData()));
+                ClientCryptoUtils.decodeBase64Data(tpmSignRequestDto.getData()));
         TpmSignResponseDto tpmSignResponseDto = new TpmSignResponseDto();
         tpmSignResponseDto.setData(CryptoUtil.encodeBase64(signedData));
         return tpmSignResponseDto;

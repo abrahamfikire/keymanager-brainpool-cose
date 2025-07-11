@@ -157,7 +157,8 @@ public class PartnerCertManagerDBHelper {
         partnerCertificateStoreRepository.saveAndFlush(keymanagerUtil.setMetaData(partnerStoreObj));
     }
 
-    public PartnerCertificateStore getPartnetCert(String certId) {
+    public PartnerCertificateStore getPartnerCert(String certId) {
         return partnerCertificateStoreRepository.findByCertId(certId);
     }
+    
 }

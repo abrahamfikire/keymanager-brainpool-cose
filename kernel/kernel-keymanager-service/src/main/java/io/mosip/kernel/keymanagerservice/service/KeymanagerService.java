@@ -2,10 +2,13 @@ package io.mosip.kernel.keymanagerservice.service;
 
 import java.util.Optional;
 
+import io.mosip.kernel.keymanagerservice.dto.AllCertificatesDataResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.CSRGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.KeyPairGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.KeyPairGenerateResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.PublicKeyResponse;
+import io.mosip.kernel.keymanagerservice.dto.RevokeKeyRequestDto;
+import io.mosip.kernel.keymanagerservice.dto.RevokeKeyResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.SignatureCertificate;
 import io.mosip.kernel.keymanagerservice.dto.SymmetricKeyGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.SymmetricKeyGenerateResponseDto;
@@ -97,6 +100,13 @@ public interface KeymanagerService {
 	 * @return {@link SymmetricKeyGenerateRequestDto} instance
 	 */
 	public SymmetricKeyGenerateResponseDto generateSymmetricKey(SymmetricKeyGenerateRequestDto symGenRequestDto);
+	/**
+	 * Key Revocation for the provided appId & refId.
+	 * 
+	 * @param RevokeKeyRequestDto revokeKeyRequestDto
+	 * @return {@link RevokeKeyResponseDto} instance
+	 */
+	public RevokeKeyResponseDto revokeKey(RevokeKeyRequestDto revokeKeyRequestDto);
 
 	/**
 	 * Check certificate exists for the provided appId & refId.
@@ -105,6 +115,23 @@ public interface KeymanagerService {
 	 * @return {@link UploadCertificateResponseDto} instance
 	 */
 	//public UploadCertificateResponseDto isCertificateExists(UploadCertificateRequestDto uploadCertRequestDto);
+
+	/**
+	 * Function to get all the certificates for the provided appId & refId.
+	 * 
+	 * @param Application ID  appId
+	 * @param Reference ID  refId
+	 * @return {@link AllCertificatesDataResponseDto} instance
+	 */
+	public AllCertificatesDataResponseDto getAllCertificates(String appId, Optional<String> refId);
+	/**
+	 * Function to generate ECC key for the provided app id and ref id.
+	 * 
+	 * @param objectType - return Object type can be a certificate or CSR
+	 * @param request - request details like appId, refIds, etc.
+	 * @return {@link KeyPairGenerateResponseDto} instance
+	 */
+	public KeyPairGenerateResponseDto generateECSignKey(String objectType, KeyPairGenerateRequestDto request);
 
 }
 

@@ -22,6 +22,8 @@ public class SignatureConstant {
 
 	public static final String JWT_SIGN = "JWTSignature";
 
+	public static final String RAW_SIGN = "RAW_SIGN";
+
 	public static final String BLANK = "";
 
 	public static final Boolean DEFAULT_INCLUDES = false;
@@ -59,4 +61,19 @@ public class SignatureConstant {
 	public static final int PSS_PARAM_SALT_LEN = 32;
 
 	public static final int PSS_PARAM_TF = 1;
+
+	public static final String REF_ID_SIGN_CONST = "SIGN";
+
+	public static final String EC256_ALGORITHM = "SHA256withECDSA";
+
+	public static final int EC256_SIGNATURE_LENGTH = 64;
+
+	public static final String ED25519_ALGORITHM = "Ed25519";
+
+	public static final String JWS_ES256_SIGN_ALGO_CONST = "ES256";
+
+	public static final String JWS_ES256K_SIGN_ALGO_CONST = "ES256K";
+
+	public static final String JWS_EDDSA_SIGN_ALGO_CONST = "EdDSA";
+	public static final String JWS_BRAINPOOL_SIGN_ALGO_CONST = "EC_BRAINPOOLP256R1_SIGN";
 }

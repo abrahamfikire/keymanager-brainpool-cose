@@ -9,11 +9,9 @@ import io.mosip.kernel.core.crypto.spi.CryptoCoreSpec;
 import io.mosip.kernel.core.exception.ExceptionUtils;
 import io.mosip.kernel.core.logger.spi.Logger;
 import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
-
-import org.junit.Assert;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import tss.tpm.TPMT_PUBLIC;
@@ -40,6 +38,15 @@ public class ClientCryptoFacade {
 
     @Autowired
     private Environment environment;
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @Value("${mosip.kernel.client.crypto.use-resident-service-module-key:false}")
+    private Boolean useResidentServiceModuleKey;
+
+    @Value("${mosip.kernel.client.crypto.resident-service-app-id:RESIDENT}")
+    private String residentServiceAppId;
 
     @Value("${mosip.kernel.client.crypto.iv-length:12}")
     private int ivLength;
@@ -71,7 +78,8 @@ public class ClientCryptoFacade {
             try {
                 LOGGER.warn(ClientCryptoManagerConstant.SESSIONID, ClientCryptoManagerConstant.INITIALIZATION, ClientCryptoManagerConstant.EMPTY,
                         "USING LOCAL CLIENT SECURITY INITIALIZED, IGNORE IF THIS IS NON-PROD ENV");
-                clientCryptoService = new LocalClientCryptoServiceImpl(cryptoCore);
+                clientCryptoService = new LocalClientCryptoServiceImpl(cryptoCore, applicationContext,
+                    useResidentServiceModuleKey, residentServiceAppId);
             } catch (Throwable ex) {
                 LOGGER.error(ClientCryptoManagerConstant.SESSIONID, ClientCryptoManagerConstant.INITIALIZATION,
                         ClientCryptoManagerConstant.EMPTY, ExceptionUtils.getStackTrace(ex));
@@ -107,14 +115,15 @@ public class ClientCryptoFacade {
     public boolean validateSignature(ClientType clientType, byte[] publicKey, byte[] signature, byte[] actualData) {
         clientType = isTPMKey(publicKey) ? ClientType.TPM : clientType;
 
-        switch (clientType == null ? clientType.LOCAL : clientType) {
+        switch (clientType == null ? ClientType.LOCAL : clientType) {
             case TPM:
                 return TPMClientCryptoServiceImpl.validateSignature(publicKey, signature, actualData);
             case ANDROID:
                 return AndroidClientCryptoServiceImpl.validateSignature(publicKey, signature, actualData);
+            default:
+                LOGGER.warn("USING LOCAL CLIENT SECURITY USED TO SIGN DATA, IGNORING IF THIS IS NON-PROD ENV");
+                return LocalClientCryptoServiceImpl.validateSignature(publicKey, signature, actualData);
         }
-        LOGGER.warn("USING LOCAL CLIENT SECURITY USED TO SIGN DATA, IGNORE IF THIS IS NON-PROD ENV");
-        return LocalClientCryptoServiceImpl.validateSignature(publicKey, signature, actualData);
     }
 
     public byte[] encrypt(ClientType clientType, byte[] publicKey, byte[] dataToEncrypt) {
@@ -126,7 +135,7 @@ public class ClientCryptoFacade {
         byte[] cipher = cryptoCore.symmetricEncrypt(secretKey, dataToEncrypt, iv, aad);
 
         byte[] encryptedSecretKey = null;
-        switch (clientType == null ? clientType.LOCAL : clientType)  {
+        switch (clientType == null ? ClientType.LOCAL : clientType)  {
             case TPM:
                 encryptedSecretKey = TPMClientCryptoServiceImpl.asymmetricEncrypt(publicKey, secretKey.getEncoded());
                 break;
@@ -149,35 +158,25 @@ public class ClientCryptoFacade {
     }
 
     public byte[] decrypt(byte[] dataToDecrypt) {
+        byte[] encryptedSecretKey = Arrays.copyOfRange(dataToDecrypt, 0, symmetricKeyLength);
+        byte[] secretKeyBytes =  Objects.requireNonNull(getClientSecurity()).asymmetricDecrypt(encryptedSecretKey);
+        SecretKey secretKey = new SecretKeySpec(secretKeyBytes, "AES");
+
         try {
-            Objects.requireNonNull(getClientSecurity());
-            byte[] encryptedSecretKey = Arrays.copyOfRange(dataToDecrypt, 0, symmetricKeyLength);
-            byte[] secretKeyBytes = getClientSecurity().asymmetricDecrypt(encryptedSecretKey);
-            byte[] iv = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength, symmetricKeyLength+ivLength);
-            byte[] aad = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + ivLength, symmetricKeyLength+ivLength+aadLength);
+            byte[] iv = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength, symmetricKeyLength + ivLength);
+            byte[] aad = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + ivLength, symmetricKeyLength + ivLength + aadLength);
             byte[] cipher = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + ivLength + aadLength,
                     dataToDecrypt.length);
-
-            SecretKey secretKey = new SecretKeySpec(secretKeyBytes, "AES");
             return cryptoCore.symmetricDecrypt(secretKey, cipher, iv, aad);
-        } catch (Exception e) {
-            LOGGER.debug("Failed to decrypt data", e);
+        } catch (Throwable t) {
+            LOGGER.error("Failed to decrypt the data due to : ", t.getMessage());
+            //1.1.4.4 backward compatibility code, for IV_LENGTH = 16 and AAD_LENGTH = 12;
+            byte[] iv = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength, symmetricKeyLength + 16);
+            byte[] aad = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + 16, symmetricKeyLength + 16 + 12);
+            byte[] cipher = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + 16 + 12,
+                    dataToDecrypt.length);
+            return cryptoCore.symmetricDecrypt(secretKey, cipher, iv, aad);
         }
-        return backwardCompatibleDecrypt(dataToDecrypt);
-    }
-
-    private byte[] backwardCompatibleDecrypt(byte[] dataToDecrypt) {
-        int IV = 16;
-        int AAD = 12;
-        Objects.requireNonNull(getClientSecurity());
-        byte[] encryptedSecretKey = Arrays.copyOfRange(dataToDecrypt, 0, symmetricKeyLength);
-        byte[] secretKeyBytes = getClientSecurity().asymmetricDecrypt(encryptedSecretKey);
-        byte[] iv = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength, symmetricKeyLength + IV);
-        byte[] aad = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + IV, symmetricKeyLength + IV + AAD);
-        byte[] cipher = Arrays.copyOfRange(dataToDecrypt, symmetricKeyLength + IV + AAD, dataToDecrypt.length);
-
-        SecretKey secretKey = new SecretKeySpec(secretKeyBytes, "AES");
-        return cryptoCore.symmetricDecrypt(secretKey, cipher, iv, aad);
     }
 
     public static byte[] generateRandomBytes(int length) {
@@ -198,7 +197,9 @@ public class ClientCryptoFacade {
             LOGGER.info(ClientCryptoManagerConstant.SESSIONID, "Client Security FACADE",
                     ClientCryptoManagerConstant.EMPTY, "Failed to generate secret key " + ExceptionUtils.getStackTrace(e));
         }
-        return null;
+        // Removed returning null, instead throwing exception to understand that key generation has failed. Otherwise it is possible for null pointer exception.
+        throw new ClientCryptoException(ClientCryptoErrorConstants.NOT_ABLE_GENERATE_KEY.getErrorCode(),
+                    ClientCryptoErrorConstants.NOT_ABLE_GENERATE_KEY.getErrorMessage());
     }
 
     private boolean isTPMKey(byte[] publicKey) {

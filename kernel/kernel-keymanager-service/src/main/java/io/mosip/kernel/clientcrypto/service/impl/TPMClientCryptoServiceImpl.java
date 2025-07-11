@@ -1,26 +1,25 @@
 package io.mosip.kernel.clientcrypto.service.impl;
 
-import io.mosip.kernel.clientcrypto.constant.ClientCryptoErrorConstants;
-import io.mosip.kernel.clientcrypto.constant.ClientCryptoManagerConstant;
-import io.mosip.kernel.clientcrypto.exception.ClientCryptoException;
-import io.mosip.kernel.clientcrypto.service.spi.ClientCryptoService;
-
-import io.mosip.kernel.core.exception.ExceptionUtils;
-import io.mosip.kernel.core.logger.spi.Logger;
-import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
-import org.junit.Assert;
-import tss.*;
-import tss.tpm.CreatePrimaryResponse;
-import tss.tpm.*;
-
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+
+import io.mosip.kernel.clientcrypto.constant.ClientCryptoErrorConstants;
+import io.mosip.kernel.clientcrypto.constant.ClientCryptoManagerConstant;
+import io.mosip.kernel.clientcrypto.exception.ClientCryptoException;
+import io.mosip.kernel.clientcrypto.service.spi.ClientCryptoService;
+import io.mosip.kernel.core.exception.ExceptionUtils;
+import io.mosip.kernel.core.logger.spi.Logger;
+import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
+import tss.*;
+import tss.tpm.CreatePrimaryResponse;
+import tss.tpm.*;
 
 /**
  * TPM is Strong and secure.
@@ -92,7 +91,11 @@ class TPMClientCryptoServiceImpl implements ClientCryptoService {
     @Override
     public byte[] signData(byte[] dataToSign) throws ClientCryptoException {
         try {
-            Assert.assertNotNull(tpm);
+            // Removed assert method, instead handling the null properly
+            if (Objects.isNull(tpm)) {
+                throw new ClientCryptoException(ClientCryptoErrorConstants.TMP_IS_NULL.getErrorCode(),
+                    ClientCryptoErrorConstants.TMP_IS_NULL.getErrorMessage());
+            }
             CreatePrimaryResponse signingKey = createSigningKey();
             TPMU_SIGNATURE signedData = null;
             synchronized(tpm) {
@@ -100,7 +103,11 @@ class TPMClientCryptoServiceImpl implements ClientCryptoService {
                         TPMT_HA.fromHashOf(TPM_ALG_ID.SHA256, dataToSign).digest, new TPMS_NULL_SIG_SCHEME(),
                         TPMT_TK_HASHCHECK.nullTicket());
             }
-            Assert.assertNotNull(signedData);
+            // Removed assert method, instead handling the null properly
+            if (Objects.isNull(signedData)) {
+                throw new ClientCryptoException(ClientCryptoErrorConstants.DATA_IS_NULL.getErrorCode(),
+                    ClientCryptoErrorConstants.DATA_IS_NULL.getErrorMessage());
+            }
             LOGGER.info(ClientCryptoManagerConstant.SESSIONID, ClientCryptoManagerConstant.TPM,
                     ClientCryptoManagerConstant.EMPTY, "Completed Signing data using TPM");
             return ((TPMS_SIGNATURE_RSASSA) signedData).sig;
@@ -129,7 +136,11 @@ class TPMClientCryptoServiceImpl implements ClientCryptoService {
     @Override
     public byte[] asymmetricDecrypt(byte[] dataToDecrypt)  throws ClientCryptoException{
         try {
-            Assert.assertNotNull(tpm);
+            // Removed assert method, instead handling the null properly
+            if (Objects.isNull(tpm)) {
+                throw new ClientCryptoException(ClientCryptoErrorConstants.TMP_IS_NULL.getErrorCode(),
+                    ClientCryptoErrorConstants.TMP_IS_NULL.getErrorMessage());
+            }
             CreatePrimaryResponse primaryResponse = createRSAKey();
 
             synchronized (tpm) {

@@ -36,11 +36,11 @@ import io.mosip.kernel.core.signatureutil.model.SignatureResponse;
 import io.mosip.kernel.core.util.CryptoUtil;
 import io.mosip.kernel.keygenerator.bouncycastle.KeyGenerator;
 import io.mosip.kernel.keymanagerservice.dto.PublicKeyResponse;
-import io.mosip.kernel.signature.dto.SignatureResponseDto;
 import io.mosip.kernel.keymanagerservice.service.KeymanagerService;
 import io.mosip.kernel.keymanagerservice.test.KeymanagerTestBootApplication;
-import io.mosip.kernel.signature.dto.TimestampRequestDto;
-import io.mosip.kernel.signature.service.SignatureService;
+import io.mosip.kernel.signatureeeee.dto.SignatureResponseDto;
+import io.mosip.kernel.signatureeeee.dto.TimestampRequestDto;
+import io.mosip.kernel.signatureeeee.service.SignatureService;
 
 @SpringBootTest(classes = KeymanagerTestBootApplication.class)
 @RunWith(SpringRunner.class)

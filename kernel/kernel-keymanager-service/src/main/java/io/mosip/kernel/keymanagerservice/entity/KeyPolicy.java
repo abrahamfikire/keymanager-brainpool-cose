@@ -44,4 +44,15 @@ public class KeyPolicy extends BaseEntity {
 	@Column(name = "is_active")
 	private boolean isActive;
 
+	/**
+	 * The field Pre Expire Days
+	 */
+	@Column(name = "pre_expire_days")
+	private int preExpireDays;
+
+	/**
+	 * The field access allowed
+	 */
+	@Column(name = "access_allowed")
+	private String accessAllowed;
 }

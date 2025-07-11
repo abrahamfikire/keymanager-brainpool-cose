@@ -11,6 +11,10 @@ import io.mosip.kernel.signature.dto.SignRequestDto;
 import io.mosip.kernel.signature.dto.SignatureResponseDto;
 import io.mosip.kernel.signature.dto.TimestampRequestDto;
 import io.mosip.kernel.signature.dto.ValidatorResponseDto;
+import io.mosip.kernel.signature.dto.COSESign1RequestDto;
+import io.mosip.kernel.signature.dto.COSESign1ResponseDto;
+import io.mosip.kernel.signature.dto.COSESign1VerifyRequestDto;
+import io.mosip.kernel.signature.dto.COSESign1VerifyResponseDto;
 
 public interface SignatureService {
 	/**
@@ -58,5 +62,21 @@ public interface SignatureService {
 	 * @return the JWTSignatureResponseDto
 	 */
 	public JWTSignatureResponseDto jwsSign(JWSSignatureRequestDto jwsSignRequestDto);
+
+	/**
+	 * COSE_Sign1 signature for the inputted data using ES256 algorithm
+	 *
+	 * @param coseSign1RequestDto the COSESign1RequestDto
+	 * @return the COSESign1ResponseDto
+	 */
+	public COSESign1ResponseDto coseSign1(COSESign1RequestDto coseSign1RequestDto);
+
+	/**
+	 * COSE_Sign1 signature verification.
+	 *
+	 * @param coseSign1VerifyRequestDto the COSESign1VerifyRequestDto
+	 * @return the COSESign1VerifyResponseDto
+	 */
+	public COSESign1VerifyResponseDto coseVerify1(COSESign1VerifyRequestDto coseSign1VerifyRequestDto);
 
 }

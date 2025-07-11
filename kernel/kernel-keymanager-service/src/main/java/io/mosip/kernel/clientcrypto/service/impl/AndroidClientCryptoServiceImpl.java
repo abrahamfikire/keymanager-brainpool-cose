@@ -1,7 +1,6 @@
 package io.mosip.kernel.clientcrypto.service.impl;
 
 import io.mosip.kernel.clientcrypto.constant.ClientCryptoErrorConstants;
-import io.mosip.kernel.clientcrypto.constant.ClientCryptoManagerConstant;
 import io.mosip.kernel.clientcrypto.exception.ClientCryptoException;
 import io.mosip.kernel.clientcrypto.service.spi.ClientCryptoService;
 import io.mosip.kernel.core.logger.spi.Logger;

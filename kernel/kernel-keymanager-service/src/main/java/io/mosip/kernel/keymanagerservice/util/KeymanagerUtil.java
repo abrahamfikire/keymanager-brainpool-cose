@@ -34,7 +34,9 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
 import javax.security.auth.x500.X500Principal;
 
+import io.mosip.kernel.core.keymanager.spi.ECKeyStore;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
@@ -42,14 +44,15 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x500.style.IETFUtils;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
-import org.bouncycastle.util.io.pem.PemObject;
-import org.bouncycastle.util.io.pem.PemReader;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
+import org.bouncycastle.util.encoders.Hex;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -58,6 +61,7 @@ import io.mosip.kernel.core.crypto.spi.CryptoCoreSpec;
 import io.mosip.kernel.core.keymanager.exception.KeystoreProcessingException;
 import io.mosip.kernel.core.keymanager.model.CertificateEntry;
 import io.mosip.kernel.core.keymanager.model.CertificateParameters;
+import io.mosip.kernel.core.logger.spi.Logger;
 import io.mosip.kernel.core.util.CryptoUtil;
 import io.mosip.kernel.core.util.DateUtils;
 import io.mosip.kernel.keygenerator.bouncycastle.KeyGenerator;
@@ -70,7 +74,6 @@ import io.mosip.kernel.keymanagerservice.entity.BaseEntity;
 import io.mosip.kernel.keymanagerservice.entity.KeyAlias;
 import io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException;
 import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
-import io.mosip.kernel.core.logger.spi.Logger;
 /**
  * Utility class for Keymanager
  * 
@@ -145,12 +148,28 @@ public class KeymanagerUtil {
 	@Value("${mosip.kernel.certificate.sign.algorithm:SHA256withRSA}")
 	private String signAlgorithm;
 
+	
+	@Value("${mosip.kernel.certificate.ec.sign.algorithm:SHA256WithECDSA}")
+	private String ecSignAlgorithm;
+
+	/**
+	 * Certificate Signing Algorithm
+	 * 
+	 */
+	@Value("${mosip.kernel.certificate.ed.sign.algorithm:Ed25519}")
+	private String edSignAlgorithm;
+
+
+	@Value("#{'${mosip.kernel.keymgr.ed25519.allowed.appids:ID_REPO}'.split(',')}")
+	private List<String> allowedAppIds;
+
 	/**
 	 * KeyGenerator instance to generate asymmetric key pairs
 	 */
 	@Autowired
 	KeyGenerator keyGenerator;
-
+	@Autowired
+	private ECKeyStore keyStore;
 	/**
 	 * {@link CryptoCoreSpec} instance for cryptographic functionalities.
 	 */
@@ -232,6 +251,10 @@ public class KeymanagerUtil {
 	 * @return decrypted key
 	 */
 	public byte[] decryptKey(byte[] key, PrivateKey privateKey, PublicKey publicKey) {
+		return decryptKey(key, privateKey, publicKey, null);
+	}
+
+	public byte[] decryptKey(byte[] key, PrivateKey privateKey, PublicKey publicKey, String keystoreType) {
 
 		int keyDemiliterIndex = 0;
 		final int cipherKeyandDataLength = key.length;
@@ -239,7 +262,7 @@ public class KeymanagerUtil {
 		keyDemiliterIndex = CryptoUtil.getSplitterIndex(key, keyDemiliterIndex, keySplitter);
 		byte[] encryptedKey = copyOfRange(key, 0, keyDemiliterIndex);
 		byte[] encryptedData = copyOfRange(key, keyDemiliterIndex + keySplitterLength, cipherKeyandDataLength);
-		byte[] decryptedSymmetricKey = cryptoCore.asymmetricDecrypt(privateKey, publicKey, encryptedKey);
+		byte[] decryptedSymmetricKey = cryptoCore.asymmetricDecrypt(privateKey, publicKey, encryptedKey, keystoreType);
 		SecretKey symmetricKey = new SecretKeySpec(decryptedSymmetricKey, 0, decryptedSymmetricKey.length,
 				symmetricAlgorithmName);
 		return cryptoCore.symmetricDecrypt(symmetricKey, encryptedData, null);
@@ -358,6 +381,25 @@ public class KeymanagerUtil {
 		return certParams;
 	}
 
+	public CertificateParameters getCertificateParameters(KeyPairGenerateRequestDto request, LocalDateTime notBefore, LocalDateTime notAfter, 
+				String appId) {
+
+		CertificateParameters certParams = new CertificateParameters();
+		String refId = request.getReferenceId();
+		if (refId.trim().length() > 0) {
+			refId = '-' + refId.toUpperCase();
+		}
+		String appIdCommonName = commonName + " (" + appId.toUpperCase() + refId + ")";
+		certParams.setCommonName(getParamValue(request.getCommonName(), appIdCommonName));
+		certParams.setOrganizationUnit(getParamValue(request.getOrganizationUnit(), organizationUnit));
+		certParams.setOrganization(getParamValue(request.getOrganization(), organization));
+		certParams.setLocation(getParamValue(request.getLocation(), location));
+		certParams.setState(getParamValue(request.getState(), state));
+		certParams.setCountry(getParamValue(request.getCountry(), country));
+		certParams.setNotBefore(notBefore);
+		certParams.setNotAfter(notAfter);
+		return certParams;
+	}
 	private static String getAttributeIfExist(X500Name x500Name, ASN1ObjectIdentifier identifier) {
         RDN[] rdns = x500Name.getRDNs(identifier);
         if (rdns.length == 0) {
@@ -401,13 +443,14 @@ public class KeymanagerUtil {
 		return defaultValue;
 	}
 	
-	public String getCSR(PrivateKey privateKey, PublicKey publicKey, CertificateParameters certParams) {
+	public String getCSR(PrivateKey privateKey, PublicKey publicKey, CertificateParameters certParams, String keyAlgorithm) {
 
 		try {
 			X500Principal csrSubject = new X500Principal("CN=" + certParams.getCommonName() + ", OU=" + certParams.getOrganizationUnit() +
 												", O=" + certParams.getOrganization() + ", L=" + certParams.getLocation() + 
 												", S=" + certParams.getState() + ", C=" + certParams.getCountry());
-			ContentSigner contentSigner = new JcaContentSignerBuilder(signAlgorithm).build(privateKey);
+			ContentSigner contentSigner = new JcaContentSignerBuilder(getSignatureAlgorithm(keyAlgorithm)).setProvider(keyStore.getKeystoreProviderName()).build(privateKey);
+
 			PKCS10CertificationRequestBuilder pcks10Builder = new JcaPKCS10CertificationRequestBuilder(csrSubject, publicKey);
 			PKCS10CertificationRequest csrObject = pcks10Builder.build(contentSigner);
 			return getPEMFormatedData(csrObject);
@@ -416,7 +459,17 @@ public class KeymanagerUtil {
 						KeymanagerErrorConstant.INTERNAL_SERVER_ERROR.getErrorMessage(), exp);
 		}
 	}
+	private String getSignatureAlgorithm(String keyAlgorithm) {
 
+		if (keyAlgorithm.equals(KeymanagerConstant.EC_KEY_TYPE)) 
+			return ecSignAlgorithm;
+		else if (keyAlgorithm.equals(KeymanagerConstant.ED25519_KEY_TYPE) || 
+				 keyAlgorithm.equals(KeymanagerConstant.ED25519_ALG_OID) || 
+				 keyAlgorithm.equals(KeymanagerConstant.EDDSA_KEY_TYPE)) 
+			return edSignAlgorithm;
+
+		return signAlgorithm;
+	}
 	public void destoryKey(PrivateKey privateKey) {
 		try {
 			privateKey.destroy();
@@ -443,4 +496,35 @@ public class KeymanagerUtil {
         ZonedDateTime converted = zonedtime.withZoneSameInstant(ZoneOffset.UTC);
         return converted.toLocalDateTime();
 	}
+
+	@SuppressWarnings("java:S4790") // added suppress for sonarcloud, sha1 hash is used for value identification only not for any sensitive data.
+	public String getUniqueIdentifier(String inputStr) {
+		return Hex.toHexString(DigestUtils.sha1(inputStr)).toUpperCase();
+	}
+
+	public void checkAppIdAllowedForEd25519KeyGen(String applicationId) {
+		if (!allowedAppIds.contains(applicationId)) {
+			throw new KeymanagerServiceException(KeymanagerErrorConstant.KEY_GEN_NOT_ALLOWED_FOR_APPID.getErrorCode(), 
+			KeymanagerErrorConstant.KEY_GEN_NOT_ALLOWED_FOR_APPID.getErrorMessage());
+		}
+	}
+
+	public boolean verifyCborSignature(byte[] coseSign1Bytes, PublicKey publicKey) {
+        try {
+            // Decode COSE_Sign1
+            // COSE.Message msg = COSE.Message.DecodeFromBytes(coseSign1Bytes); // This line would require a COSE library
+            // if (!(msg instanceof Sign1Message)) {
+            //     throw new IllegalArgumentException("Not a COSE_Sign1 message");
+            // }
+            // Sign1Message sign1 = (Sign1Message) msg;
+
+            // Verify signature
+            // return sign1.validate(publicKey); // This line would require a COSE library
+            return false; // Placeholder for actual verification logic
+        } catch (Exception e) {
+            LOGGER.error(KeymanagerConstant.SESSIONID, "CBOR_VERIFY", KeymanagerConstant.EMPTY,
+                    "Error verifying CBOR signature", e);
+            return false;
+        }
+    }
 }

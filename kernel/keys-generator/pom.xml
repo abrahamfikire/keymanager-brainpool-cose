@@ -1,10 +1,10 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
- 
+
   <groupId>io.mosip.kernel</groupId>
   <artifactId>keys-generator</artifactId>
   <version>1.1.5.5-P1</version>
-  <properties>		
+  <properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
 		<!-- maven -->
@@ -25,12 +25,12 @@
 		<spring.data.jpa.version>2.0.7.RELEASE</spring.data.jpa.version>
 		<spring.security.test.version>5.0.5.RELEASE</spring.security.test.version>
 		<spring-cloud-config.version>2.0.4.RELEASE</spring-cloud-config.version>
-                
+
 		<!-- swagger -->
 		<swagger.core.version>2.0.7</swagger.core.version>
 		<swagger.annotations.version>1.5.21</swagger.annotations.version>
 		<springfox.version>2.9.2</springfox.version>
-                
+
 		<!-- vertx -->
 		<vertx.version>3.6.2</vertx.version>
 		<vertx.health.check.version>3.7.0</vertx.health.check.version>
@@ -65,9 +65,9 @@
 		<jcl.to.slf4j.version>1.7.25</jcl.to.slf4j.version>
 
 		<!-- json -->
-		<jackson.version>2.9.5</jackson.version>
-		<jackson.datatype.version>2.9.8</jackson.datatype.version>
-		<jackson.databind>2.9.6</jackson.databind>
+		<jackson.version>2.14.0</jackson.version>
+		<jackson.datatype.version>2.14.0</jackson.datatype.version>
+		<jackson.databind>2.14.0</jackson.databind>
 		<json.utility.version>20180130</json.utility.version>
 		<json.schema.validator.version>2.2.10</json.schema.validator.version>
 		<json.version>20180813</json.version>
@@ -136,7 +136,10 @@
 		<jose4j.version>0.6.5</jose4j.version>
 
 		<tss.version>0.3.0</tss.version>
-	</properties>
+
+	  <com.fasterxml.jackson.version>2.9.9</com.fasterxml.jackson.version>
+
+  </properties>
 
   <dependencies>
   	<dependency>
@@ -158,7 +161,7 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-config</artifactId>
 			<version>${spring-cloud-config.version}</version>
-		</dependency>				
+		</dependency>
   	<dependency>
   		<groupId>org.postgresql</groupId>
   		<artifactId>postgresql</artifactId>
@@ -181,18 +184,37 @@
     <artifactId>javassist</artifactId>
     <version>3.25.0-GA</version>
 </dependency>
+
+
+	  <dependency>
+		  <groupId>com.fasterxml.jackson.core</groupId>
+		  <artifactId>jackson-databind</artifactId>
+		  <version>${com.fasterxml.jackson.version}</version>
+	  </dependency>
+	  <dependency>
+		  <groupId>com.fasterxml.jackson.datatype</groupId>
+		  <artifactId>jackson-datatype-jsr310</artifactId>
+		  <version>${com.fasterxml.jackson.version}</version>
+	  </dependency>
+	  
+	  <dependency>
+		  <groupId>com.fasterxml.jackson.core</groupId>
+		  <artifactId>jackson-annotations</artifactId>
+		  <version>2.15.2</version>
+		  <scope>compile</scope>
+	  </dependency>
   </dependencies>
-  
+
 <distributionManagement>
 		<snapshotRepository>
                         <id>ossrh</id>
                         <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-		</snapshotRepository> 
+		</snapshotRepository>
                  <repository>
                         <id>ossrh</id>
                         <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-                </repository> 
-        </distributionManagement> 
+                </repository>
+        </distributionManagement>
         <build>
 <plugins>
 			<plugin>
@@ -212,7 +234,7 @@
 					</execution>
 				</executions>
 			</plugin>
-		   
+
             <plugin>
               <artifactId>maven-deploy-plugin</artifactId>
               <version>2.8.1</version>
@@ -245,7 +267,7 @@
                         <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                         <autoReleaseAfterClose>false</autoReleaseAfterClose>
                   </configuration>
-                </plugin> 
+                </plugin>
 
                <plugin>
                   <groupId>org.apache.maven.plugins</groupId>

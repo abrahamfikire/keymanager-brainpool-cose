@@ -1,5 +1,7 @@
 package io.mosip.kernel.keymanagerservice.constant;
 
+import java.time.format.DateTimeFormatter;
+
 /**
  * Constants for Keymanager
  * 
@@ -63,7 +65,7 @@ public class KeymanagerConstant {
 	/**
 	 * The constant Getting public key from DB Store
 	 */
-	public static final String GETPUBLICKEYDB = "Getting public key from DB Store";
+	public static final String GETPUBLICKEYDB = "Getting Certificate from DB Store";
 
 	/**
 	 * The constant Getting public key from SoftHSM
@@ -171,15 +173,57 @@ public class KeymanagerConstant {
 
 	public static final String SYMM_KEY_EXISTS = "Key Exists.";
 
-	public static final String VALID_REFERENCE_ID_GETTING_KEY_ALIAS_WITH_REFERENCE_ID = "Valid reference Id. Getting key alias with referenceId";
+	public static final String REQ_REV_KEY = "Request for key revocation.";
 
-	public static final String NOT_A_VALID_REFERENCE_ID_GETTING_KEY_ALIAS_WITHOUT_REFERENCE_ID = "Not a valid reference Id. Getting key alias without referenceId";
+	public static final String KEY_REVOKED = "Key Revoked";
 
-	public static final String HYPHEN = "-";
+	public static final String ENCRYPTION_KEY = "EncryptionKey";
 
 	public static final String KERNEL_APP_ID = "KERNEL";
 
 	public static final String KERNEL_IDENTIFY_CACHE = "IDENTITY_CACHE";
 
+	public static final String VALID_REFERENCE_ID_GETTING_KEY_ALIAS_WITH_REFERENCE_ID = "Valid reference Id. Getting key alias with referenceId";
+
+	public static final String NOT_A_VALID_REFERENCE_ID_GETTING_KEY_ALIAS_WITHOUT_REFERENCE_ID = "Not a valid reference Id. Getting key alias without referenceId";
+
+	public static final String PARTNER_APP_ID = "PARTNER";
+
+	public static final String HYPHEN = "-";
+
+	public static final String DATE_FORMAT = "MM-dd-yyyy";
+
+	public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT);
+
+	public static final String UNDER_SCORE = "_";
+
 	public static final String COMPONENT_MASTER_KEY_DUMMY_REF = "COMP_MASTER";
+
+	public static final String ALL_GET_CERTIFICATES = "Request received to get all the Certificates";
+
+	public static final String DOT = ".";
+
+	public static final String COMMA = ",";
+
+	public static final String GENERATE_ECC_MASTER_KEY = "Request received to generate the ECC Master Key pair.";
+
+	public static final String ECC_CURVE = "Curve";
+
+	public static final String MISSING_INPUT_PARAMETER = "Missing Input Parameter - ";
+
+	public static final String VALIDATE = "Validate";
+
+	public static final String INVALID_CURVE_VALUE = "Invalid Curve Value - ";
+
+	public static final String IDA_APP_ID = "IDA";
+
+	public static final String EC_KEY_TYPE = "EC";
+
+	public static final String ED25519_KEY_TYPE = "Ed25519";
+
+	public static final String EDDSA_KEY_TYPE = "EdDSA";
+
+	public static final String ED25519_ALG_OID = "1.3.101.112";
+
+	public static final String APP_REF_ID_SEP = "#";
 }

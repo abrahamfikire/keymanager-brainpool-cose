@@ -2,6 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>io.mosip.kernel</groupId>
@@ -57,6 +58,8 @@
 		<mysql.connector.version>5.1.46</mysql.connector.version>
 		<postgresql.version>42.2.2</postgresql.version>
 		<eclipselink.version>2.5.0</eclipselink.version>
+		<de.mkammerer.argon2-jvm-nolibs.version>2.11</de.mkammerer.argon2-jvm-nolibs.version>
+
 		<hibernate.version>5.2.17.Final</hibernate.version>
 		<hibernate.validator.version>6.0.12.Final</hibernate.validator.version>
 
@@ -73,9 +76,9 @@
 		<jcl.to.slf4j.version>1.7.25</jcl.to.slf4j.version>
 
 		<!-- json -->
-		<jackson.version>2.9.5</jackson.version>
-		<jackson.datatype.version>2.9.8</jackson.datatype.version>
-		<jackson.databind>2.9.6</jackson.databind>
+		<jackson.version>2.13.0</jackson.version>
+		<jackson.datatype.version>2.13.0</jackson.datatype.version>
+		<jackson.databind>2.13.0</jackson.databind>
 		<json.utility.version>20180130</json.utility.version>
 		<json.schema.validator.version>2.2.10</json.schema.validator.version>
 		<json.version>20180813</json.version>
@@ -140,17 +143,22 @@
 		<kernel-dataaccess-hibernate.version>1.1.5.3</kernel-dataaccess-hibernate.version>
 		<kernel.logger.logback.version>1.1.5.3</kernel.logger.logback.version>
 		<kernel.pdfgenerator.itext.version>1.1.5.3</kernel.pdfgenerator.itext.version>
-		<jose4j.version>0.6.5</jose4j.version>
+		<jose4j.version>0.9.6</jose4j.version>
 
 		<tss.version>0.3.0</tss.version>
 		<cache2k-version>2.4.1.Final</cache2k-version>
 		<springdoc.version>1.5.10</springdoc.version>
 		<jacoco.maven.plugin.version>0.8.5</jacoco.maven.plugin.version>
 		<com.nimbusds.nimbus-jose-jwt.version>9.14</com.nimbusds.nimbus-jose-jwt.version>
-		<com.fasterxml.jackson.core.version>2.12.0</com.fasterxml.jackson.core.version>
-		<fasterxml.jackson.module.afterburner.version>2.12.0</fasterxml.jackson.module.afterburner.version>
+		<com.fasterxml.jackson.core.version>2.13.0</com.fasterxml.jackson.core.version>
+		<fasterxml.jackson.module.afterburner.version>2.13.0</fasterxml.jackson.module.afterburner.version>
 	</properties>
-
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
 	<dependencies>
 		<dependency>
 			<groupId>io.mosip.kernel</groupId>
@@ -213,6 +221,11 @@
 			<artifactId>jose4j</artifactId>
 			<version>${jose4j.version}</version>
 		</dependency>
+				<dependency>
+			<groupId>de.mkammerer</groupId>
+			<artifactId>argon2-jvm-nolibs</artifactId>
+			<version>${de.mkammerer.argon2-jvm-nolibs.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>com.github.microsoft</groupId>
 			<artifactId>TSS.Java</artifactId>
@@ -242,22 +255,22 @@
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
-			<version>${com.fasterxml.jackson.core.version}</version>
+			<version>${jackson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-annotations</artifactId>
-			<version>${com.fasterxml.jackson.core.version}</version>
+			<version>${jackson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-core</artifactId>
-			<version>${com.fasterxml.jackson.core.version}</version>
+			<version>${jackson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.datatype</groupId>
 			<artifactId>jackson-datatype-jsr310</artifactId>
-			<version>${com.fasterxml.jackson.core.version}</version>
+			<version>${jackson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.nimbusds</groupId>
@@ -267,13 +280,34 @@
 		<dependency>
 			<groupId>com.fasterxml.jackson.module</groupId>
 			<artifactId>jackson-module-afterburner</artifactId>
-			<version>${fasterxml.jackson.module.afterburner.version}</version>
+			<version>${jackson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.projectreactor</groupId>
 			<artifactId>reactor-core</artifactId>
 			<version>3.1.7.RELEASE</version>
 		</dependency>
+		<dependency>
+			<groupId>com.github.multiformats</groupId>
+			<artifactId>java-multibase</artifactId>
+			<version>1.1.1</version>
+		</dependency>
+		<dependency>
+  <groupId>org.projectlombok</groupId>
+  <artifactId>lombok</artifactId>
+  <version>1.18.30</version>
+  <scope>provided</scope>
+</dependency>
+        <dependency>
+            <groupId>com.augustcellars.cose</groupId>
+            <artifactId>cose-java</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-cbor</artifactId>
+            <version>2.13.0</version>
+        </dependency>
 	</dependencies>
 	
 <distributionManagement>
@@ -295,11 +329,11 @@
 				<configuration>
 					<executable>true</executable>
 					<layout>ZIP</layout>
+					<mainClass>io.mosip.kernel.keymanagerservice.KeymanagerBootApplication</mainClass>
 				</configuration>
 				<executions>
 					<execution>
 						<goals>
-							<goal>build-info</goal>
 							<goal>repackage</goal>
 						</goals>
 					</execution>

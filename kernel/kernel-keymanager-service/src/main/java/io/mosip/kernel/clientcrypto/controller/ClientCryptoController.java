@@ -23,6 +23,9 @@ import io.mosip.kernel.core.http.RequestWrapper;
 import io.mosip.kernel.core.http.ResponseFilter;
 import io.mosip.kernel.core.http.ResponseWrapper;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 
 /**
  * @author Anusha Sunkada
@@ -36,13 +39,19 @@ public class ClientCryptoController {
 
     @Autowired
     private ClientCryptoManagerService clientCryptoManagerService;
-
     /**
      *
      * @param tpmSignRequestDtoRequestWrapper
      * @return
      */
-	@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+    @ApiOperation(value = "Sign data using tpm", notes = "Sign data using tpm", tags = { "clientcrypto" })
+	@ApiResponses(value = {
+			@ApiResponse(code = 200, message = "Success or you may find errors in error array in response"),
+			@ApiResponse(code = 401, message = "Unauthorized"),
+			@ApiResponse(code = 403, message = "Forbidden"),
+			@ApiResponse(code = 404, message = "Not Found")
+	})
+    //@PreAuthorize("hasAnyRole(@clientCryptoAuthRoles.getPostcssign())")
     @ResponseFilter
     @PostMapping(value = "/cssign", produces = "application/json")
     public ResponseWrapper<TpmSignResponseDto> signData(@RequestBody @Valid RequestWrapper<TpmSignRequestDto>
@@ -57,7 +66,16 @@ public class ClientCryptoController {
      * @param tpmSignVerifyRequestDtoRequestWrapper
      * @return
      */
-	@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+	//@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+    @ApiOperation(value = "Verify signature", notes  = "Verify signature", tags = { "clientcrypto" })
+	@ApiResponses(value = {
+			@ApiResponse(code = 200, message = "Success or you may find errors in error array in response"),
+			@ApiResponse(code = 401, message = "Unauthorized"),
+			@ApiResponse(code = 403, message = "Forbidden"),
+			@ApiResponse(code = 404, message = "Not Found")
+        })
+       // @PreAuthorize("hasAnyRole(@clientCryptoAuthRoles.getPostcsverifysign())")
+
     @ResponseFilter
     @PostMapping(value = "/csverifysign", produces = "application/json")
     public ResponseWrapper<TpmSignVerifyResponseDto> verifySignature(@RequestBody @Valid RequestWrapper<TpmSignVerifyRequestDto>
@@ -72,7 +90,16 @@ public class ClientCryptoController {
      * @param tpmCryptoRequestDtoRequestWrapper
      * @return
      */
-	@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+	//@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+    @ApiOperation(value  = "Encrypt data using tpm", notes = "Encrypt data using tpm", tags = { "clientcrypto" })
+	@ApiResponses(value = {
+			@ApiResponse(code = 200, message = "Success or you may find errors in error array in response"),
+			@ApiResponse(code = 401, message = "Unauthorized"),
+			@ApiResponse(code = 403, message = "Forbidden"),
+			@ApiResponse(code = 404, message = "Not Found")
+    })
+	//@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+   // @PreAuthorize("hasAnyRole(@clientCryptoAuthRoles.getPosttpmencrypt())")
     @ResponseFilter
     @PostMapping(value = "/tpmencrypt", produces = "application/json")
     public ResponseWrapper<TpmCryptoResponseDto> tpmEncrypt(@RequestBody @Valid RequestWrapper<TpmCryptoRequestDto>
@@ -87,7 +114,15 @@ public class ClientCryptoController {
      * @param tpmCryptoRequestDtoRequestWrapper
      * @return
      */
-	@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+	//@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")     
+    @ApiOperation(value  = "Decrypt data using tpm", notes = "Decrypt data using tpm", tags = { "clientcrypto" })
+	@ApiResponses(value = {
+			@ApiResponse(code = 200, message = "Success or you may find errors in error array in response"),
+			@ApiResponse(code = 401, message = "Unauthorized"),
+			@ApiResponse(code = 403, message = "Forbidden"),
+			@ApiResponse(code = 404, message = "Not Found")
+    })
+   // @PreAuthorize("hasAnyRole(@clientCryptoAuthRoles.getPosttpmdecrypt())")
     @ResponseFilter
     @PostMapping(value = "/tpmdecrypt", produces = "application/json")
     public ResponseWrapper<TpmCryptoResponseDto> tpmDecrypt(@RequestBody @Valid RequestWrapper<TpmCryptoRequestDto>
@@ -102,7 +137,15 @@ public class ClientCryptoController {
      * @param publicKeyRequestDtoRequestWrapper
      * @return
      */
-	@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+	//@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+    @ApiOperation(value  = "Get signinging public key", notes = "Get signinging public key", tags = { "clientcrypto" })
+	@ApiResponses(value = {
+			@ApiResponse(code = 200, message = "Success or you may find errors in error array in response"),
+			@ApiResponse(code = 401, message = "Unauthorized"),
+			@ApiResponse(code = 403, message = "Forbidden"),
+			@ApiResponse(code = 404, message = "Not Found")
+    })
+  //  @PreAuthorize("hasAnyRole(@clientCryptoAuthRoles.getPosttpmsigningpublickey())")
     @ResponseFilter
     @PostMapping(value = "/tpmsigning/publickey", produces = "application/json")
     public ResponseWrapper<PublicKeyResponseDto> getSigningPublicKey(@RequestBody @Valid RequestWrapper<PublicKeyRequestDto>
@@ -117,7 +160,15 @@ public class ClientCryptoController {
      * @param publicKeyRequestDtoRequestWrapper
      * @return
      */
-	@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+	//@PreAuthorize("hasAnyRole('ZONAL_ADMIN','GLOBAL_ADMIN','INDIVIDUAL','ID_AUTHENTICATION','TEST', 'REGISTRATION_ADMIN', 'REGISTRATION_SUPERVISOR', 'REGISTRATION_OFFICER', 'REGISTRATION_PROCESSOR','PRE_REGISTRATION_ADMIN','RESIDENT')")
+    @ApiOperation(value  = "et encryption public key", notes = "et encryption public key", tags = { "clientcrypto" })
+	@ApiResponses(value = {
+			@ApiResponse(code = 200, message = "Success or you may find errors in error array in response"),
+			@ApiResponse(code = 401, message = "Unauthorized"),
+			@ApiResponse(code = 403, message = "Forbidden"),
+			@ApiResponse(code = 404, message = "Not Found")
+        })
+   // @PreAuthorize("hasAnyRole(@clientCryptoAuthRoles.getPosttpmencryptionpublickey())")
     @ResponseFilter
     @PostMapping(value = "/tpmencryption/publickey", produces = "application/json")
     public ResponseWrapper<PublicKeyResponseDto> getEncPublicKey(@RequestBody @Valid RequestWrapper<PublicKeyRequestDto>

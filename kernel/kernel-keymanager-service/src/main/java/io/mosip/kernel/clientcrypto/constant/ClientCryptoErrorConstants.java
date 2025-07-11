@@ -6,7 +6,10 @@ public enum ClientCryptoErrorConstants {
     INITIALIZATION_ERROR("KER-CC-002", "FAILED TO INITIALIZE CC INSTANCE"),
     CONTEXT_RELOAD_REQUIRED("KER-CC-003", "Restart / reload context"),
     CRYPTO_FAILED("KER-CC-004", "Failed crypto operation"),
-    TPM_REQUIRED_FLAG_NOT_SET("KER-CC-005", "TPM required flag not set");
+    TPM_REQUIRED_FLAG_NOT_SET("KER-CC-005", "TPM required flag not set"),
+    NOT_ABLE_GENERATE_KEY("KER-CC-006", "Symmetric key generation failed."),
+    TMP_IS_NULL("KER-CC-007", "TPM is null."),
+    DATA_IS_NULL("KER-CC-008", "Signed Data is null.");
 
     /**
      * The error code.

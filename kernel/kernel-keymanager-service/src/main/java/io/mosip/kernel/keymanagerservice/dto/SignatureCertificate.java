@@ -57,6 +57,11 @@ public class SignatureCertificate {
 	 * The string keystore provider name
 	 */
 	private String providerName;
+
+	/**
+	 * The string for key unique identifier.
+	 */
+	private String uniqueIdentifier;
 	
 
 	@Override

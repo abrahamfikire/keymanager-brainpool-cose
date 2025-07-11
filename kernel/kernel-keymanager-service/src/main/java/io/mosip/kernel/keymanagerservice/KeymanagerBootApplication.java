@@ -2,6 +2,7 @@ package io.mosip.kernel.keymanagerservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 
 /**
  * Key Manager Application
@@ -10,11 +11,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @since 1.0.0
  *
  */
+//exclude =  SecurityAutoConfiguration.class
 @SpringBootApplication(scanBasePackages = { "io.mosip.kernel.cryptomanager.*", "io.mosip.kernel.keymanagerservice.*",
 		"${mosip.auth.adapter.impl.basepackage}", "io.mosip.kernel.signature.*", "io.mosip.kernel.tokenidgenerator.*",
 		"io.mosip.kernel.lkeymanager.*", "io.mosip.kernel.keymanager.*", "io.mosip.kernel.keygenerator.*",
 		"io.mosip.kernel.crypto.*", "io.mosip.kernel.zkcryptoservice.*", "io.mosip.kernel.partnercertservice.*",
-		"io.mosip.kernel.clientcrypto.*", "io.mosip.kernel.core.logger.config"})
+		"io.mosip.kernel.clientcrypto.*", "io.mosip.kernel.core.logger.config"},exclude =  SecurityAutoConfiguration.class)
+
 public class KeymanagerBootApplication {
 
 	/**

@@ -2,6 +2,7 @@ package io.mosip.kernel.crypto.jce.core;
 
 import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -54,14 +55,14 @@ import io.mosip.kernel.crypto.jce.util.CryptoUtils;
 
 /**
  * This class provided <b> Basic and Core Cryptographic functionalities </b>.
- * 
+ *
  * This class follows {@link CryptoCoreSpec} and implement all basic
  * Cryptographic functions.
- * 
+ *
  * @author Urvil Joshi
  * @author Rajath
  * @since 1.0.0
- * 
+ *
  * @see CryptoCoreSpec
  * @see PrivateKey
  * @see PublicKey
@@ -78,7 +79,8 @@ public class CryptoCore implements CryptoCoreSpec<byte[], byte[], SecretKey, Pub
 
 	// Used as a hack for softhsm oeap padding decryption usecase will be when we
 	// will use in HSM
-	private static final String RSA_ECB_NO_PADDING = "RSA/ECB/NoPadding";
+	@SuppressWarnings("java:S106")
+	private static final String RSA_ECB_NO_PADDING = "RSA/ECB/NoPadding"; // NOSONAR using the padding for allowing OAEP padding in PKCS11 library
 
 	private static final String PKCS11_STORE_TYPE = "PKCS11";
 
@@ -287,33 +289,44 @@ public class CryptoCore implements CryptoCoreSpec<byte[], byte[], SecretKey, Pub
 		}
 		return doFinal(data, cipher);
 	}
-	
+
 	@Override
 	public byte[] asymmetricDecrypt(PrivateKey privateKey, byte[] data) {
 		if (PKCS11_STORE_TYPE.equalsIgnoreCase(keystoreType)) {
 			BigInteger keyModulus = ((RSAPrivateKey) privateKey).getModulus();
-			return asymmetricDecrypt(privateKey, keyModulus, data);
+			return asymmetricDecrypt(privateKey, keyModulus, data, null);
 		}
-		return jceAsymmetricDecrypt(privateKey, data);
+		return jceAsymmetricDecrypt(privateKey, data, null);
 	}
 
 	@Override
 	public byte[] asymmetricDecrypt(PrivateKey privateKey, PublicKey publicKey, byte[] data) {
 		if (PKCS11_STORE_TYPE.equalsIgnoreCase(keystoreType)) {
-			BigInteger keyModulus = Objects.nonNull(publicKey) ? ((RSAPublicKey) publicKey).getModulus() : 
-										((RSAPrivateKey) privateKey).getModulus();
-			return asymmetricDecrypt(privateKey, keyModulus, data);
+			BigInteger keyModulus = Objects.nonNull(publicKey) ? ((RSAPublicKey) publicKey).getModulus() :
+					((RSAPrivateKey) privateKey).getModulus();
+			return asymmetricDecrypt(privateKey, keyModulus, data, null);
 		}
-		return jceAsymmetricDecrypt(privateKey, data);
+		return jceAsymmetricDecrypt(privateKey, data, null);
 	}
 
-	private byte[] asymmetricDecrypt(PrivateKey privateKey, BigInteger keyModulus, byte[] data) {
+	@Override
+	public byte[] asymmetricDecrypt(PrivateKey privateKey, PublicKey publicKey, byte[] data, String storeType) {
+		if (PKCS11_STORE_TYPE.equalsIgnoreCase(keystoreType)) {
+			BigInteger keyModulus = Objects.nonNull(publicKey) ? ((RSAPublicKey) publicKey).getModulus() :
+					((RSAPrivateKey) privateKey).getModulus();
+			return asymmetricDecrypt(privateKey, keyModulus, data, storeType);
+		}
+		return jceAsymmetricDecrypt(privateKey, data, storeType);
+	}
+
+	private byte[] asymmetricDecrypt(PrivateKey privateKey, BigInteger keyModulus, byte[] data, String storeType) {
 		Objects.requireNonNull(privateKey, SecurityExceptionCodeConstant.MOSIP_INVALID_KEY_EXCEPTION.getErrorMessage());
 		CryptoUtils.verifyData(data);
 		Cipher cipher;
 		try {
-			cipher = Cipher.getInstance(RSA_ECB_NO_PADDING);
-		} catch (java.security.NoSuchAlgorithmException | NoSuchPaddingException e) {
+			cipher = Objects.isNull(storeType) ? Cipher.getInstance(RSA_ECB_NO_PADDING) :  // NOSONAR using the padding for allowing OAEP padding in PKCS11 library
+					Cipher.getInstance(RSA_ECB_NO_PADDING, storeType); // NOSONAR using the padding for allowing OAEP padding in PKCS11 library
+		} catch (java.security.NoSuchAlgorithmException | NoSuchPaddingException | NoSuchProviderException e) {
 			throw new NoSuchAlgorithmException(
 					SecurityExceptionCodeConstant.MOSIP_NO_SUCH_ALGORITHM_EXCEPTION.getErrorCode(),
 					SecurityExceptionCodeConstant.MOSIP_NO_SUCH_ALGORITHM_EXCEPTION.getErrorMessage(), e);
@@ -336,43 +349,44 @@ public class CryptoCore implements CryptoCoreSpec<byte[], byte[], SecretKey, Pub
 					paddedPlainText.length);
 			paddedPlainText = tempPipe;
 		}
-		
+
 		return unpadOAEPPadding(paddedPlainText, keyModulus);
 	}
 
 	//	  This is a hack of removing OEAP padding after decryption with NO Padding as
 	//	  SoftHSM does not support it.Will be removed after HSM implementation
 	/**
-	 * 
+	 *
 	 * @param paddedPlainText
-	 * @param privateKey
+	 * @param keyModulus
 	 * @return
 	 */
 	private byte[] unpadOAEPPadding(byte[] paddedPlainText, BigInteger keyModulus) {
-		
-	    try {
-	    	OAEPEncoding encode = new OAEPEncoding(new RSAEngine(), new SHA256Digest());
-		    BigInteger exponent = new BigInteger("1");
-		    RSAKeyParameters keyParams = new RSAKeyParameters(false, keyModulus, exponent);
-		    encode.init(false, keyParams);
+
+		try {
+			OAEPEncoding encode = new OAEPEncoding(new RSAEngine(), new SHA256Digest());
+			BigInteger exponent = new BigInteger("1");
+			RSAKeyParameters keyParams = new RSAKeyParameters(false, keyModulus, exponent);
+			encode.init(false, keyParams);
 			return encode.processBlock(paddedPlainText, 0, paddedPlainText.length);
 		} catch (InvalidCipherTextException e) {
 			throw new InvalidKeyException(SecurityExceptionCodeConstant.MOSIP_INVALID_KEY_EXCEPTION
 					.getErrorCode(), e.getMessage(), e);
-		}	    
+		}
 	}
-	 
-	private byte[] jceAsymmetricDecrypt(PrivateKey privateKey, byte[] data){
+
+	private byte[] jceAsymmetricDecrypt(PrivateKey privateKey, byte[] data, String storeType){
 		Objects.requireNonNull(privateKey, SecurityExceptionCodeConstant.MOSIP_INVALID_KEY_EXCEPTION.getErrorMessage());
 		CryptoUtils.verifyData(data);
 		Cipher cipher;
 		try {
-			cipher = Cipher.getInstance(asymmetricAlgorithm);
+			cipher = Objects.isNull(storeType) ? Cipher.getInstance(asymmetricAlgorithm) :
+					Cipher.getInstance(asymmetricAlgorithm, storeType);
 			OAEPParameterSpec oaepParams = new OAEPParameterSpec(HASH_ALGO, MGF1, MGF1ParameterSpec.SHA256,
-				PSpecified.DEFAULT);
+					PSpecified.DEFAULT);
 			cipher.init(Cipher.DECRYPT_MODE, privateKey, oaepParams);
 			return doFinal(data, cipher);
-		} catch (java.security.NoSuchAlgorithmException | NoSuchPaddingException e) {
+		} catch (java.security.NoSuchAlgorithmException | NoSuchPaddingException | NoSuchProviderException e) {
 			throw new NoSuchAlgorithmException(
 					SecurityExceptionCodeConstant.MOSIP_NO_SUCH_ALGORITHM_EXCEPTION.getErrorCode(),
 					SecurityExceptionCodeConstant.MOSIP_NO_SUCH_ALGORITHM_EXCEPTION.getErrorMessage(), e);
@@ -457,7 +471,7 @@ public class CryptoCore implements CryptoCoreSpec<byte[], byte[], SecretKey, Pub
 
 	/**
 	 * Generator for IV(Initialisation Vector)
-	 * 
+	 *
 	 * @param blockSize blocksize of current cipher
 	 * @return generated IV
 	 */
@@ -530,4 +544,6 @@ public class CryptoCore implements CryptoCoreSpec<byte[], byte[], SecretKey, Pub
 		}
 
 	}
+
+
 }

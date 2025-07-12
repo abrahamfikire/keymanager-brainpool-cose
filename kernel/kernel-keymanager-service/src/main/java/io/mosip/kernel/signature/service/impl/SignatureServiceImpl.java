@@ -1451,6 +1451,18 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 				"Signature verification result: {}", valid);
 		
+		// TEMPORARY: Add detailed logging for debugging
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"=== VERIFICATION DEBUG ===");
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Raw verification result: {}", valid);
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Provider: {}", providerName);
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Public key algorithm: {}", publicKey.getAlgorithm());
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"=== END VERIFICATION DEBUG ===");
+		
 		CWTClaimsSet claimsSet = CWTClaimsSet.build(sign1.getPayload());
 		Date date = claimsSet.getExp();
 		long exp = date.getTime() / 1000;

@@ -62,8 +62,8 @@ import io.mosip.kernel.keymanagerservice.repository.KeyPolicyRepository;
 import io.mosip.kernel.keymanagerservice.repository.KeyStoreRepository;
 import io.mosip.kernel.keymanagerservice.test.KeymanagerTestBootApplication;
 import io.mosip.kernel.keymanagerservice.util.KeymanagerUtil;
-import io.mosip.kernel.signatureeeee.dto.SignatureRequestDto;
-import io.mosip.kernel.signatureeeee.dto.SignatureResponseDto;
+import io.mosip.kernel.signature.dto.SignatureRequestDto;
+import io.mosip.kernel.signature.dto.SignatureResponseDto;
 
 /**
  * @author Dharmesh Khandelwal

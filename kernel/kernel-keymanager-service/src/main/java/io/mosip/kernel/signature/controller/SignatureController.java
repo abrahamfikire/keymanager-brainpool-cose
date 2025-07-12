@@ -28,6 +28,10 @@ import io.mosip.kernel.signature.dto.SignResponseDto;
 import io.mosip.kernel.signature.dto.SignatureResponseDto;
 import io.mosip.kernel.signature.dto.TimestampRequestDto;
 import io.mosip.kernel.signature.dto.ValidatorResponseDto;
+import io.mosip.kernel.signature.dto.CBORSignatureRequestDto;
+import io.mosip.kernel.signature.dto.CBORSignatureResponseDto;
+import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
+import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
 import io.mosip.kernel.signature.service.SignatureService;
 
 /**
@@ -162,6 +166,36 @@ public class SignatureController {
     public ResponseWrapper<COSESign1VerifyResponseDto> coseVerify1(@RequestBody @Valid RequestWrapper<COSESign1VerifyRequestDto> requestDto) {
         COSESign1VerifyResponseDto signatureResponse = service.coseVerify1(requestDto.getRequest());
         ResponseWrapper<COSESign1VerifyResponseDto> response = new ResponseWrapper<>();
+        response.setResponse(signatureResponse);
+        return response;
+    }
+
+    /**
+     * Function to do CBOR signature for the inputted data
+     *
+     * @param requestDto {@link CBORSignatureRequestDto} having required fields.
+     * @return The {@link CBORSignatureResponseDto}
+     */
+    @ResponseFilter
+    @PostMapping(value = "/cborSign")
+    public ResponseWrapper<CBORSignatureResponseDto> cborSign(@RequestBody @Valid RequestWrapper<CBORSignatureRequestDto> requestDto) {
+        CBORSignatureResponseDto signatureResponse = service.cborSign(requestDto.getRequest());
+        ResponseWrapper<CBORSignatureResponseDto> response = new ResponseWrapper<>();
+        response.setResponse(signatureResponse);
+        return response;
+    }
+
+    /**
+     * Function to verify CBOR signature
+     *
+     * @param requestDto {@link CBORSignatureVerifyRequestDto} having required fields.
+     * @return The {@link CBORSignatureVerifyResponseDto}
+     */
+    @ResponseFilter
+    @PostMapping(value = "/cborVerify")
+    public ResponseWrapper<CBORSignatureVerifyResponseDto> cborVerify(@RequestBody @Valid RequestWrapper<CBORSignatureVerifyRequestDto> requestDto) {
+        CBORSignatureVerifyResponseDto signatureResponse = service.cborVerify(requestDto.getRequest());
+        ResponseWrapper<CBORSignatureVerifyResponseDto> response = new ResponseWrapper<>();
         response.setResponse(signatureResponse);
         return response;
     }

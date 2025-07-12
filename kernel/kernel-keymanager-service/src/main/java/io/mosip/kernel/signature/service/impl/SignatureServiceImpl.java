@@ -86,6 +86,35 @@ import io.mosip.kernel.signature.dto.COSESign1VerifyResponseDto;
 import io.mosip.kernel.signature.util.COSESign1Util;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
+import com.authlete.cbor.CBORByteArray;
+import com.authlete.cbor.CBORDecoder;
+import com.authlete.cbor.CBORItem;
+import com.authlete.cbor.CBORPairList;
+import com.authlete.cbor.CBORizer;
+import com.authlete.cose.constants.COSEAlgorithms;
+import com.authlete.cose.COSEProtectedHeader;
+import com.authlete.cose.COSEProtectedHeaderBuilder;
+import com.authlete.cose.COSEUnprotectedHeader;
+import com.authlete.cose.COSEUnprotectedHeaderBuilder;
+import com.authlete.cose.COSESigner;
+import com.authlete.cose.COSEVerifier;
+import com.authlete.cose.COSESign1;
+import com.authlete.cose.COSESign1Builder;
+import com.authlete.cose.COSEMessage;
+import com.authlete.cose.SigStructure;
+import com.authlete.cose.SigStructureBuilder;
+import com.authlete.cwt.CWT;
+import com.authlete.cwt.CWTClaimsSet;
+import com.authlete.cwt.CWTClaimsSetBuilder;
+import java.security.cert.X509Certificate;
+import java.time.Instant;
+import java.util.Date;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+import java.util.Map;
+import java.util.Optional;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
 
 /**
  * @author Uday Kumar
@@ -859,6 +888,130 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 						KeymanagerErrorConstant.INVALID_FORMAT_ERROR.getErrorMessage());
 		}
 		return signedData;
+	}
+
+	@Override
+	public CBORSignatureResponseDto cborSign(CBORSignatureRequestDto cborSignRequestDto) {
+		CBORSignatureResponseDto responseDto = new CBORSignatureResponseDto();
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		try {
+			String signedHex = cborSignInternal(cborSignRequestDto.getDataToSign(), cborSignRequestDto.getApplicationId(), cborSignRequestDto.getReferenceId(), timestamp);
+			responseDto.setCborSignedData(signedHex);
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
+		} catch (Exception e) {
+			LOGGER.error("CBOR Sign error", e);
+			responseDto.setCborSignedData(null);
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
+		}
+		return responseDto;
+	}
+
+	@Override
+	public CBORSignatureVerifyResponseDto cborVerify(CBORSignatureVerifyRequestDto cborSignatureVerifyRequestDto) {
+		CBORSignatureVerifyResponseDto responseDto = new CBORSignatureVerifyResponseDto();
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		try {
+			boolean valid = cborVerifyInternal(cborSignatureVerifyRequestDto.getCborSignatureData(), cborSignatureVerifyRequestDto.getApplicationId(), cborSignatureVerifyRequestDto.getReferenceId(), timestamp);
+			responseDto.setSignatureValid(valid);
+			responseDto.setMessage(valid ? "Validation successful" : "Validation failed");
+			responseDto.setTrustValid(valid); // Placeholder, update with real trust logic
+		} catch (Exception e) {
+			LOGGER.error("CBOR Verify error", e);
+			responseDto.setSignatureValid(false);
+			responseDto.setMessage("Exception: " + e.getMessage());
+			responseDto.setTrustValid(false);
+		}
+		return responseDto;
+	}
+
+	// --- CBOR/CWT core logic (simplified, adapt as needed) ---
+	private static final int CLAIM_169 = 169;
+	private static final String ISS = "www.mosip.io";
+	private String cborSignInternal(String claim169Data, String applicationId, String referenceId, String timestamp) throws Exception {
+		// Fallback logic as in JWT
+		if (!keymanagerUtil.isValidApplicationId(applicationId)) {
+			applicationId = signApplicationid;
+			referenceId = signRefid;
+		}
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
+		ECPrivateKey ecPrivateKey = (ECPrivateKey) certificateResponse.getCertificateEntry().getPrivateKey();
+		String keyId = certificateResponse.getUniqueIdentifier();
+		int algorithm = COSEAlgorithms.ES256;
+		COSEProtectedHeader protectedHeader = new COSEProtectedHeaderBuilder().alg(algorithm).build();
+		COSEUnprotectedHeader unprotectedHeader = new COSEUnprotectedHeaderBuilder().kid(keyId).build();
+		long currentTime = Instant.now().getEpochSecond();
+		long expireTime = currentTime + 365L * 24 * 60 * 60; // 1 year expiry
+		byte[] claim169Bytes;
+		try {
+			claim169Bytes = Hex.decodeHex(claim169Data.toCharArray());
+		} catch (DecoderException e) {
+			throw new RuntimeException("Invalid hex string for claim169Data", e);
+		}
+		CBORItem item = new CBORDecoder(claim169Bytes).next();
+		CBORPairList pairList = (CBORPairList) item;
+		Map<Object, Object> claim169Map = pairList.parse();
+		for (Object key : claim169Map.keySet()) {
+			if (((Integer) key) == 62) {
+				Map<Object, Object> photoDataMap = (Map) claim169Map.get(key);
+				String photoData = (String) photoDataMap.get(Integer.valueOf(0));
+				byte[] photoBytes;
+				try {
+					photoBytes = Hex.decodeHex(photoData.toCharArray());
+				} catch (DecoderException e) {
+					throw new RuntimeException("Invalid hex string for photoData", e);
+				}
+				photoDataMap.put(0, photoBytes);
+				claim169Map.put(62, photoDataMap);
+				break;
+			}
+		}
+		CBORPairList updatedPairList = (CBORPairList) new CBORizer().cborizeMap(claim169Map);
+		byte[] claim169Bts = updatedPairList.encode();
+		CWTClaimsSet claimsSet = new CWTClaimsSetBuilder()
+				.iss(ISS)
+				.exp(expireTime)
+				.nbf(currentTime)
+				.iat(currentTime)
+				.put(CLAIM_169, claim169Bts)
+				.build();
+		CBORByteArray claim169Payload = new CBORByteArray(claimsSet.encode());
+		SigStructure sigStructure = new SigStructureBuilder().signature1()
+				.bodyAttributes(protectedHeader)
+				.payload(claim169Payload)
+				.build();
+		COSESigner signer = new COSESigner(ecPrivateKey);
+		byte[] signature = signer.sign(sigStructure, algorithm);
+		COSESign1 sign1 = new COSESign1Builder()
+				.protectedHeader(protectedHeader)
+				.unprotectedHeader(unprotectedHeader)
+				.payload(claim169Payload)
+				.signature(signature)
+				.build();
+		CWT cwt = new CWT(sign1);
+		return cwt.encodeToHex();
+	}
+
+	private boolean cborVerifyInternal(String cwtSignedData, String applicationId, String referenceId, String timestamp) throws Exception {
+		if (!keymanagerUtil.isValidApplicationId(applicationId)) {
+			applicationId = signApplicationid;
+			referenceId = signRefid;
+		}
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
+		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
+		ECPublicKey ecPublicKey = (ECPublicKey) cert.getPublicKey();
+		COSEVerifier verifier = new COSEVerifier(ecPublicKey);
+		byte[] encodedCWT = Hex.decodeHex(cwtSignedData.toCharArray());
+		CWT cwt = (CWT) new CBORDecoder(encodedCWT).next();
+		COSEMessage message = cwt.getMessage();
+		COSESign1 sign1 = (COSESign1) message;
+		boolean valid = verifier.verify(sign1);
+		CWTClaimsSet claimsSet = CWTClaimsSet.build(sign1.getPayload());
+		Date date = claimsSet.getExp();
+		long exp = date.getTime() / 1000;
+		long currentTime = Instant.now().getEpochSecond();
+		return valid && (exp > currentTime);
 	}
 
 	public static class EcdsaSECP256K1UsingSha256 extends EcdsaUsingShaAlgorithm

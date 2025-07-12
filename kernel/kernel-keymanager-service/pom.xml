@@ -287,6 +287,11 @@
 			<artifactId>reactor-core</artifactId>
 			<version>3.1.7.RELEASE</version>
 		</dependency>
+		    <dependency>
+       <groupId>com.authlete</groupId>
+       <artifactId>cbor</artifactId>
+       <version>1.19</version>
+   </dependency>
 		<dependency>
 			<groupId>com.github.multiformats</groupId>
 			<artifactId>java-multibase</artifactId>

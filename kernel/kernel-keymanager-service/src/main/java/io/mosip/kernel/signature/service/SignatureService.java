@@ -15,6 +15,10 @@ import io.mosip.kernel.signature.dto.COSESign1RequestDto;
 import io.mosip.kernel.signature.dto.COSESign1ResponseDto;
 import io.mosip.kernel.signature.dto.COSESign1VerifyRequestDto;
 import io.mosip.kernel.signature.dto.COSESign1VerifyResponseDto;
+import io.mosip.kernel.signature.dto.CBORSignatureRequestDto;
+import io.mosip.kernel.signature.dto.CBORSignatureResponseDto;
+import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
+import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
 
 public interface SignatureService {
 	/**
@@ -79,4 +83,19 @@ public interface SignatureService {
 	 */
 	public COSESign1VerifyResponseDto coseVerify1(COSESign1VerifyRequestDto coseSign1VerifyRequestDto);
 
+    /**
+     * CBOR signature for the inputted data
+     *
+     * @param cborSignRequestDto the CBORSignatureRequestDto
+     * @return the CBORSignatureResponseDto
+     */
+    public CBORSignatureResponseDto cborSign(CBORSignatureRequestDto cborSignRequestDto);
+
+    /**
+     * CBOR signature verification.
+     *
+     * @param cborSignatureVerifyRequestDto the CBORSignatureVerifyRequestDto
+     * @return the CBORSignatureVerifyResponseDto
+     */
+    public CBORSignatureVerifyResponseDto cborVerify(CBORSignatureVerifyRequestDto cborSignatureVerifyRequestDto);
 }

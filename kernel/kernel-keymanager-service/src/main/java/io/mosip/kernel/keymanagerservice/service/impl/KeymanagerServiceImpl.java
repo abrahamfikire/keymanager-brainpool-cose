@@ -78,7 +78,7 @@ import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
 import io.mosip.kernel.keymanagerservice.service.KeymanagerService;
 import io.mosip.kernel.keymanagerservice.util.KeymanagerUtil;
 import io.mosip.kernel.keymanagerservice.validator.ECKeyPairGenRequestValidator;
-import io.mosip.kernel.signatureeeee.util.SignatureUtil;
+import io.mosip.kernel.signature.util.SignatureUtil;
 
 
 /**

@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import io.mosip.kernel.core.http.RequestWrapper;
 import io.mosip.kernel.core.http.ResponseFilter;
 import io.mosip.kernel.core.http.ResponseWrapper;
+import io.mosip.kernel.core.logger.spi.Logger;
 import io.mosip.kernel.core.signatureutil.model.SignatureResponse;
+import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
+import io.mosip.kernel.signature.constant.SignatureConstant;
 import io.mosip.kernel.signature.dto.COSESign1RequestDto;
 import io.mosip.kernel.signature.dto.COSESign1ResponseDto;
 import io.mosip.kernel.signature.dto.COSESign1VerifyRequestDto;
@@ -44,6 +47,9 @@ import io.mosip.kernel.signature.service.SignatureService;
 @RestController
 @CrossOrigin
 public class SignatureController {
+	
+	private static final Logger LOGGER = KeymanagerLogger.getLogger(SignatureController.class);
+	
 	/**
 	 * Crypto signature Service field with functions related to signature
 	 */
@@ -179,10 +185,62 @@ public class SignatureController {
     @ResponseFilter
     @PostMapping(value = "/cborSign")
     public ResponseWrapper<CBORSignatureResponseDto> cborSign(@RequestBody @Valid RequestWrapper<CBORSignatureRequestDto> requestDto) {
-        CBORSignatureResponseDto signatureResponse = service.cborSign(requestDto.getRequest());
-        ResponseWrapper<CBORSignatureResponseDto> response = new ResponseWrapper<>();
-        response.setResponse(signatureResponse);
-        return response;
+        String sessionId = SignatureConstant.SESSIONID;
+        
+        LOGGER.info(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                "Received CBOR signing request. RequestId: {}, ApplicationId: {}, ReferenceId: {}", 
+                requestDto.getId(), 
+                requestDto.getRequest().getApplicationId(), 
+                requestDto.getRequest().getReferenceId());
+        
+        // Log input data details for debugging
+        String dataToSign = requestDto.getRequest().getDataToSign();
+        if (dataToSign != null) {
+            LOGGER.debug(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                    "Input dataToSign length: {} characters", dataToSign.length());
+            
+            // Log first and last few characters for debugging (without exposing full data)
+            if (dataToSign.length() > 20) {
+                LOGGER.debug(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                        "Input dataToSign preview: {}...{}", 
+                        dataToSign.substring(0, 10), 
+                        dataToSign.substring(dataToSign.length() - 10));
+            } else {
+                LOGGER.debug(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                        "Input dataToSign: {}", dataToSign);
+            }
+            
+            // Check for common issues
+            if (dataToSign.length() % 2 != 0) {
+                LOGGER.warn(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                        "Input hex string has odd number of characters: {}", dataToSign.length());
+            }
+        } else {
+            LOGGER.warn(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                    "Input dataToSign is null");
+        }
+        
+        try {
+            CBORSignatureResponseDto signatureResponse = service.cborSign(requestDto.getRequest());
+            ResponseWrapper<CBORSignatureResponseDto> response = new ResponseWrapper<>();
+            response.setResponse(signatureResponse);
+            
+            // Log response details
+            if (signatureResponse.getCborSignedData() != null) {
+                LOGGER.info(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                        "CBOR signing completed successfully. Output length: {} characters", 
+                        signatureResponse.getCborSignedData().length());
+            } else {
+                LOGGER.warn(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                        "CBOR signing completed but output is null");
+            }
+            
+            return response;
+        } catch (Exception e) {
+            LOGGER.error(sessionId, "CBOR_SIGN_CONTROLLER", SignatureConstant.BLANK,
+                    "Exception in CBOR signing controller: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     /**
@@ -194,9 +252,51 @@ public class SignatureController {
     @ResponseFilter
     @PostMapping(value = "/cborVerify")
     public ResponseWrapper<CBORSignatureVerifyResponseDto> cborVerify(@RequestBody @Valid RequestWrapper<CBORSignatureVerifyRequestDto> requestDto) {
-        CBORSignatureVerifyResponseDto signatureResponse = service.cborVerify(requestDto.getRequest());
-        ResponseWrapper<CBORSignatureVerifyResponseDto> response = new ResponseWrapper<>();
-        response.setResponse(signatureResponse);
-        return response;
+        String sessionId = SignatureConstant.SESSIONID;
+        
+        LOGGER.info(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                "Received CBOR verification request. RequestId: {}, ApplicationId: {}, ReferenceId: {}", 
+                requestDto.getId(), 
+                requestDto.getRequest().getApplicationId(), 
+                requestDto.getRequest().getReferenceId());
+        
+        // Log input data details for debugging
+        String cborSignatureData = requestDto.getRequest().getCborSignatureData();
+        if (cborSignatureData != null) {
+            LOGGER.debug(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                    "Input cborSignatureData length: {} characters", cborSignatureData.length());
+            
+            // Log first and last few characters for debugging
+            if (cborSignatureData.length() > 20) {
+                LOGGER.debug(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                        "Input cborSignatureData preview: {}...{}", 
+                        cborSignatureData.substring(0, 10), 
+                        cborSignatureData.substring(cborSignatureData.length() - 10));
+            } else {
+                LOGGER.debug(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                        "Input cborSignatureData: {}", cborSignatureData);
+            }
+        } else {
+            LOGGER.warn(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                    "Input cborSignatureData is null");
+        }
+        
+        try {
+            CBORSignatureVerifyResponseDto signatureResponse = service.cborVerify(requestDto.getRequest());
+            ResponseWrapper<CBORSignatureVerifyResponseDto> response = new ResponseWrapper<>();
+            response.setResponse(signatureResponse);
+            
+            // Log response details
+            LOGGER.info(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                    "CBOR verification completed. Result: {}, Message: {}", 
+                    signatureResponse.isSignatureValid() ? "VALID" : "INVALID",
+                    signatureResponse.getMessage());
+            
+            return response;
+        } catch (Exception e) {
+            LOGGER.error(sessionId, "CBOR_VERIFY_CONTROLLER", SignatureConstant.BLANK,
+                    "Exception in CBOR verification controller: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 }

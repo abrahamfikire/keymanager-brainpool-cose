@@ -115,6 +115,8 @@ import java.util.Map;
 import java.util.Optional;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
+import com.authlete.cbor.CBORMalformedUtf8Exception;
+import com.authlete.cbor.CBORInsufficientDataException;
 
 /**
  * @author Uday Kumar
@@ -894,12 +896,72 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 	public CBORSignatureResponseDto cborSign(CBORSignatureRequestDto cborSignRequestDto) {
 		CBORSignatureResponseDto responseDto = new CBORSignatureResponseDto();
 		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		String sessionId = SignatureConstant.SESSIONID;
+		
+		LOGGER.info(sessionId, "CBOR_SIGN", SignatureConstant.BLANK, 
+				"Starting CBOR signing process. ApplicationId: {}, ReferenceId: {}", 
+				cborSignRequestDto.getApplicationId(), cborSignRequestDto.getReferenceId());
+		
 		try {
-			String signedHex = cborSignInternal(cborSignRequestDto.getDataToSign(), cborSignRequestDto.getApplicationId(), cborSignRequestDto.getReferenceId(), timestamp);
+			// Validate input data
+			if (!SignatureUtil.isDataValid(cborSignRequestDto.getDataToSign())) {
+				LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+						"Invalid dataToSign provided. Data is null or empty.");
+				throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+						SignatureErrorCode.INVALID_INPUT.getErrorMessage());
+			}
+			
+			LOGGER.debug(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+					"Input dataToSign length: {} characters", cborSignRequestDto.getDataToSign().length());
+			
+			// Check if hex string has even length
+			if (cborSignRequestDto.getDataToSign().length() % 2 != 0) {
+				LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+						"Invalid hex string: odd number of characters. Length: {}", 
+						cborSignRequestDto.getDataToSign().length());
+				throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+						"Invalid hex string: odd number of characters");
+			}
+			
+			String signedHex = cborSignInternal(cborSignRequestDto.getDataToSign(), 
+					cborSignRequestDto.getApplicationId(), 
+					cborSignRequestDto.getReferenceId(), 
+					timestamp);
+			
 			responseDto.setCborSignedData(signedHex);
 			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
+			
+			LOGGER.info(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+					"CBOR signing completed successfully. Output length: {} characters", 
+					signedHex != null ? signedHex.length() : 0);
+			
+		} catch (DecoderException e) {
+			LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+					"Hex decoding error: {}", e.getMessage(), e);
+			responseDto.setCborSignedData(null);
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
+		} catch (CBORMalformedUtf8Exception e) {
+			LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+					"CBOR UTF-8 error at offset {}: {}. This indicates binary data was encoded as text string.", 
+					e.getOffset(), e.getMessage(), e);
+			try {
+				LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+						"Problematic bytes around offset {}: {}", e.getOffset(), 
+						getHexBytesAroundOffset(Hex.decodeHex(cborSignRequestDto.getDataToSign().toCharArray()), e.getOffset()));
+			} catch (DecoderException hexException) {
+				LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+						"Failed to decode hex for byte analysis: {}", hexException.getMessage());
+			}
+			responseDto.setCborSignedData(null);
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
+		} catch (CBORInsufficientDataException e) {
+			LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+					"CBOR insufficient data: {}. Input may be truncated.", e.getMessage(), e);
+			responseDto.setCborSignedData(null);
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
 		} catch (Exception e) {
-			LOGGER.error("CBOR Sign error", e);
+			LOGGER.error(sessionId, "CBOR_SIGN", SignatureConstant.BLANK,
+					"Unexpected error during CBOR signing: {}", e.getMessage(), e);
 			responseDto.setCborSignedData(null);
 			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTimeString());
 		}
@@ -910,13 +972,47 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 	public CBORSignatureVerifyResponseDto cborVerify(CBORSignatureVerifyRequestDto cborSignatureVerifyRequestDto) {
 		CBORSignatureVerifyResponseDto responseDto = new CBORSignatureVerifyResponseDto();
 		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		String sessionId = SignatureConstant.SESSIONID;
+		
+		LOGGER.info(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK, 
+				"Starting CBOR verification process. ApplicationId: {}, ReferenceId: {}", 
+				cborSignatureVerifyRequestDto.getApplicationId(), cborSignatureVerifyRequestDto.getReferenceId());
+		
 		try {
-			boolean valid = cborVerifyInternal(cborSignatureVerifyRequestDto.getCborSignatureData(), cborSignatureVerifyRequestDto.getApplicationId(), cborSignatureVerifyRequestDto.getReferenceId(), timestamp);
+			if (!SignatureUtil.isDataValid(cborSignatureVerifyRequestDto.getCborSignatureData())) {
+				LOGGER.error(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
+						"Invalid cborSignatureData provided. Data is null or empty.");
+				throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+						SignatureErrorCode.INVALID_INPUT.getErrorMessage());
+			}
+			
+			boolean valid = cborVerifyInternal(cborSignatureVerifyRequestDto.getCborSignatureData(), 
+					cborSignatureVerifyRequestDto.getApplicationId(), 
+					cborSignatureVerifyRequestDto.getReferenceId(), 
+					timestamp);
+			
 			responseDto.setSignatureValid(valid);
 			responseDto.setMessage(valid ? "Validation successful" : "Validation failed");
-			responseDto.setTrustValid(valid); // Placeholder, update with real trust logic
+			responseDto.setTrustValid(valid);
+			
+			LOGGER.info(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
+					"CBOR verification completed. Result: {}", valid ? "VALID" : "INVALID");
+			
+		} catch (DecoderException e) {
+			LOGGER.error(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
+					"Hex decoding error during verification: {}", e.getMessage(), e);
+			responseDto.setSignatureValid(false);
+			responseDto.setMessage("Hex decoding error: " + e.getMessage());
+			responseDto.setTrustValid(false);
+		} catch (CBORMalformedUtf8Exception e) {
+			LOGGER.error(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
+					"CBOR UTF-8 error during verification at offset {}: {}", e.getOffset(), e.getMessage(), e);
+			responseDto.setSignatureValid(false);
+			responseDto.setMessage("CBOR UTF-8 error: " + e.getMessage());
+			responseDto.setTrustValid(false);
 		} catch (Exception e) {
-			LOGGER.error("CBOR Verify error", e);
+			LOGGER.error(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
+					"Unexpected error during CBOR verification: {}", e.getMessage(), e);
 			responseDto.setSignatureValid(false);
 			responseDto.setMessage("Exception: " + e.getMessage());
 			responseDto.setTrustValid(false);
@@ -928,37 +1024,106 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 	private static final int CLAIM_169 = 169;
 	private static final String ISS = "www.mosip.io";
 	private String cborSignInternal(String claim169Data, String applicationId, String referenceId, String timestamp) throws Exception {
+		String sessionId = SignatureConstant.SESSIONID;
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Processing CBOR signing with applicationId: {}, referenceId: {}", applicationId, referenceId);
+		
 		// Fallback logic as in JWT
 		if (!keymanagerUtil.isValidApplicationId(applicationId)) {
+			LOGGER.warn(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"Invalid applicationId: {}. Using default: {}", applicationId, signApplicationid);
 			applicationId = signApplicationid;
 			referenceId = signRefid;
 		}
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Getting signature certificate for applicationId: {}, referenceId: {}", applicationId, referenceId);
+		
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Certificate validation successful. KeyId: {}", certificateResponse.getUniqueIdentifier());
+		
 		ECPrivateKey ecPrivateKey = (ECPrivateKey) certificateResponse.getCertificateEntry().getPrivateKey();
 		String keyId = certificateResponse.getUniqueIdentifier();
 		int algorithm = COSEAlgorithms.ES256;
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Using algorithm: {}, keyId: {}", algorithm, keyId);
+		
 		COSEProtectedHeader protectedHeader = new COSEProtectedHeaderBuilder().alg(algorithm).build();
 		COSEUnprotectedHeader unprotectedHeader = new COSEUnprotectedHeaderBuilder().kid(keyId).build();
 		long currentTime = Instant.now().getEpochSecond();
 		long expireTime = currentTime + 365L * 24 * 60 * 60; // 1 year expiry
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Decoding hex string to bytes. Input length: {}", claim169Data.length());
+		
 		byte[] claim169Bytes;
 		try {
 			claim169Bytes = Hex.decodeHex(claim169Data.toCharArray());
+			LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"Hex decoding successful. Decoded bytes length: {}", claim169Bytes.length);
 		} catch (DecoderException e) {
+			LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"Failed to decode hex string: {}. Input: {}", e.getMessage(), 
+					claim169Data.length() > 100 ? claim169Data.substring(0, 100) + "..." : claim169Data);
 			throw new RuntimeException("Invalid hex string for claim169Data", e);
 		}
-		CBORItem item = new CBORDecoder(claim169Bytes).next();
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Starting CBOR decoding of claim169 data");
+		
+		CBORItem item;
+		try {
+			item = new CBORDecoder(claim169Bytes).next();
+			LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"CBOR decoding successful. Item type: {}", item.getClass().getSimpleName());
+		} catch (CBORMalformedUtf8Exception e) {
+			LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"CBOR UTF-8 error at offset {}: {}. This indicates binary data was encoded as text string.", 
+					e.getOffset(), e.getMessage());
+			LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"Problematic bytes around offset {}: {}", e.getOffset(), 
+					getHexBytesAroundOffset(Hex.decodeHex(claim169Data.toCharArray()), e.getOffset()));
+			throw e;
+		} catch (CBORInsufficientDataException e) {
+			LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"CBOR insufficient data: {}. Input may be truncated.", e.getMessage());
+			throw e;
+		} catch (Exception e) {
+			LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"CBOR decoding error: {}", e.getMessage(), e);
+			throw e;
+		}
+		
 		CBORPairList pairList = (CBORPairList) item;
 		Map<Object, Object> claim169Map = pairList.parse();
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"CBOR map parsed successfully. Map size: {}", claim169Map.size());
+		
+		// Process photo data if present
 		for (Object key : claim169Map.keySet()) {
 			if (((Integer) key) == 62) {
+				LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+						"Found photo data (key 62), processing...");
 				Map<Object, Object> photoDataMap = (Map) claim169Map.get(key);
 				String photoData = (String) photoDataMap.get(Integer.valueOf(0));
+				
+				LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+						"Photo data hex length: {}", photoData != null ? photoData.length() : 0);
+				
 				byte[] photoBytes;
 				try {
 					photoBytes = Hex.decodeHex(photoData.toCharArray());
+					LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+							"Photo data hex decoding successful. Decoded bytes: {}", photoBytes.length);
 				} catch (DecoderException e) {
+					LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+							"Failed to decode photo data hex string: {}", e.getMessage());
 					throw new RuntimeException("Invalid hex string for photoData", e);
 				}
 				photoDataMap.put(0, photoBytes);
@@ -966,8 +1131,16 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				break;
 			}
 		}
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Creating updated CBOR structure");
+		
 		CBORPairList updatedPairList = (CBORPairList) new CBORizer().cborizeMap(claim169Map);
 		byte[] claim169Bts = updatedPairList.encode();
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Updated CBOR structure encoded. Size: {} bytes", claim169Bts.length);
+		
 		CWTClaimsSet claimsSet = new CWTClaimsSetBuilder()
 				.iss(ISS)
 				.exp(expireTime)
@@ -975,43 +1148,109 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				.iat(currentTime)
 				.put(CLAIM_169, claim169Bts)
 				.build();
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"CWT claims set created. Issuer: {}, Expiry: {}", ISS, expireTime);
+		
 		CBORByteArray claim169Payload = new CBORByteArray(claimsSet.encode());
 		SigStructure sigStructure = new SigStructureBuilder().signature1()
 				.bodyAttributes(protectedHeader)
 				.payload(claim169Payload)
 				.build();
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Signature structure created. Starting signing process");
+		
 		COSESigner signer = new COSESigner(ecPrivateKey);
 		byte[] signature = signer.sign(sigStructure, algorithm);
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Signature created. Signature length: {} bytes", signature.length);
+		
 		COSESign1 sign1 = new COSESign1Builder()
 				.protectedHeader(protectedHeader)
 				.unprotectedHeader(unprotectedHeader)
 				.payload(claim169Payload)
 				.signature(signature)
 				.build();
+		
 		CWT cwt = new CWT(sign1);
-		return cwt.encodeToHex();
+		String result = cwt.encodeToHex();
+		
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"CBOR signing completed. Final hex length: {}", result.length());
+		
+		return result;
 	}
 
 	private boolean cborVerifyInternal(String cwtSignedData, String applicationId, String referenceId, String timestamp) throws Exception {
+		String sessionId = SignatureConstant.SESSIONID;
+		
+		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Processing CBOR verification with applicationId: {}, referenceId: {}", applicationId, referenceId);
+		
 		if (!keymanagerUtil.isValidApplicationId(applicationId)) {
+			LOGGER.warn(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					"Invalid applicationId: {}. Using default: {}", applicationId, signApplicationid);
 			applicationId = signApplicationid;
 			referenceId = signRefid;
 		}
+		
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
 		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
 		ECPublicKey ecPublicKey = (ECPublicKey) cert.getPublicKey();
+		
+		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Certificate retrieved and validated. Starting verification");
+		
 		COSEVerifier verifier = new COSEVerifier(ecPublicKey);
 		byte[] encodedCWT = Hex.decodeHex(cwtSignedData.toCharArray());
+		
+		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"CWT hex decoded. Length: {} bytes", encodedCWT.length);
+		
 		CWT cwt = (CWT) new CBORDecoder(encodedCWT).next();
 		COSEMessage message = cwt.getMessage();
 		COSESign1 sign1 = (COSESign1) message;
+		
+		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"CWT decoded successfully. Starting signature verification");
+		
 		boolean valid = verifier.verify(sign1);
+		
+		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Signature verification result: {}", valid);
+		
 		CWTClaimsSet claimsSet = CWTClaimsSet.build(sign1.getPayload());
 		Date date = claimsSet.getExp();
 		long exp = date.getTime() / 1000;
 		long currentTime = Instant.now().getEpochSecond();
+		
+		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Token expiry check. Expiry: {}, Current: {}, Valid: {}", exp, currentTime, exp > currentTime);
+		
 		return valid && (exp > currentTime);
+	}
+	
+	/**
+	 * Helper method to get hex representation of bytes around a specific offset
+	 * for debugging CBOR errors
+	 */
+	private String getHexBytesAroundOffset(byte[] data, int offset) {
+		int start = Math.max(0, offset - 10);
+		int end = Math.min(data.length, offset + 10);
+		StringBuilder sb = new StringBuilder();
+		for (int i = start; i < end; i++) {
+			if (i == offset) {
+				sb.append(">>>");
+			}
+			sb.append(String.format("%02x ", data[i]));
+			if (i == offset) {
+				sb.append("<<< ");
+			}
+		}
+		return sb.toString();
 	}
 
 	public static class EcdsaSECP256K1UsingSha256 extends EcdsaUsingShaAlgorithm

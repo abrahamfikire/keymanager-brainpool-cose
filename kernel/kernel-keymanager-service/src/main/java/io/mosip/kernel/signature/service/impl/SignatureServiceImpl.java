@@ -1323,20 +1323,58 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 					"Direct COSE verification result: {}", valid);
 		} catch (Exception e) {
-			LOGGER.error(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
-					"Direct COSE verification failed with provider {}: {}", 
-					providerName, e.getMessage(), e);
-			LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
-					"Direct COSE verification result: false (due to exception)");
-			valid = false;
-		}
-		
-		// TEMPORARY: For testing purposes, always return true if signature structure is valid
-		// This helps us test if the rest of the verification flow works
-		if (!valid) {
 			LOGGER.warn(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
-					"Temporary workaround: Forcing verification to true for testing");
-			valid = true;
+					"Direct COSE verification failed with provider {}, trying alternative approach: {}", 
+					providerName, e.getMessage());
+			
+			// Alternative: Use Java's Signature class with provider-specific configuration
+			try {
+				java.security.Signature sig;
+				if (providerName != null && providerName.toLowerCase().contains("pkcs11")) {
+					// PKCS#11 provider (SoftHSM2) - use default provider for better compatibility
+					sig = java.security.Signature.getInstance("SHA256withECDSA");
+					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+							"Using default provider for PKCS#11 (SoftHSM2) verification");
+				} else if (providerName != null && providerName.toLowerCase().contains("jce")) {
+					// JCE provider (Luna HSM) - use the specific provider
+					sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
+					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+							"Using JCE provider (Luna HSM) for verification");
+				} else {
+					// Other providers - use default
+					sig = java.security.Signature.getInstance("SHA256withECDSA");
+					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+							"Using default provider for verification");
+				}
+				
+				// Reconstruct the signature structure for verification
+				COSEProtectedHeader protectedHeader = sign1.getProtectedHeader();
+				CBORItem payloadItem = sign1.getPayload();
+				byte[] payloadBytes;
+				if (payloadItem instanceof CBORByteArray) {
+					payloadBytes = ((CBORByteArray) payloadItem).getValue();
+				} else {
+					payloadBytes = payloadItem.encode();
+				}
+				CBORByteArray payload = new CBORByteArray(payloadBytes);
+				SigStructure sigStructure = new SigStructureBuilder().signature1()
+						.bodyAttributes(protectedHeader)
+						.payload(payload)
+						.build();
+				
+				sig.initVerify(publicKey);
+				sig.update(sigStructure.encode());
+				byte[] signatureBytes = sign1.getSignature().getValue();
+				valid = sig.verify(signatureBytes);
+				
+				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+						"Alternative verification result: {}", valid);
+			} catch (Exception altException) {
+				LOGGER.error(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+						"Both verification approaches failed with provider {}. Original: {}, Alternative: {}", 
+						providerName, e.getMessage(), altException.getMessage());
+				valid = false;
+			}
 		}
 		
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,

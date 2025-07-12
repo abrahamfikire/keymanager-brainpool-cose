@@ -1046,7 +1046,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"Certificate validation successful. KeyId: {}", certificateResponse.getUniqueIdentifier());
 		
-		ECPrivateKey ecPrivateKey = (ECPrivateKey) certificateResponse.getCertificateEntry().getPrivateKey();
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 		String keyId = certificateResponse.getUniqueIdentifier();
 		int algorithm = COSEAlgorithms.ES256;
 		
@@ -1161,7 +1161,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"Signature structure created. Starting signing process");
 		
-		COSESigner signer = new COSESigner(ecPrivateKey);
+		COSESigner signer = new COSESigner(privateKey);
 		byte[] signature = signer.sign(sigStructure, algorithm);
 		
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,

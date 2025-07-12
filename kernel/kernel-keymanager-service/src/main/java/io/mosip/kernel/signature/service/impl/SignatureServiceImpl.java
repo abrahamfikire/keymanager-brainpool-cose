@@ -1166,8 +1166,23 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"Signature structure created. Starting signing process");
 		
-		// BACKUP: Original complex fallback approach
+		// CURRENT: Simplified approach following JWT signing pattern (NOT WORKING with HSM)
 		/*
+		// Use the same approach as JWT signing with EC keys
+		COSESigner signer = new COSESigner(privateKey);
+		
+		// Set provider context like JWT signing does
+		if (!ecKeyStore.getKeystoreProviderName().equals(
+				io.mosip.kernel.keymanager.hsm.constant.KeymanagerConstant.KEYSTORE_TYPE_OFFLINE)) {
+			ProviderContext provContext = new ProviderContext();
+			provContext.getSuppliedKeyProviderContext().setSignatureProvider(ecKeyStore.getKeystoreProviderName());
+			// Note: COSESigner doesn't have setProviderContext method, so we rely on the key's provider
+		}
+		
+		byte[] signature = signer.sign(sigStructure, algorithm);
+		*/
+		
+		// BACKUP: Original complex fallback approach (WORKING with HSM)
 		byte[] signature;
 		String providerName = ecKeyStore.getKeystoreProviderName();
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
@@ -1217,21 +1232,6 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				throw new RuntimeException("Failed to sign with HSM key (provider: " + providerName + ")", altException);
 			}
 		}
-		*/
-		
-		// CURRENT: Simplified approach following JWT signing pattern
-		// Use the same approach as JWT signing with EC keys
-		COSESigner signer = new COSESigner(privateKey);
-		
-		// Set provider context like JWT signing does
-		if (!ecKeyStore.getKeystoreProviderName().equals(
-				io.mosip.kernel.keymanager.hsm.constant.KeymanagerConstant.KEYSTORE_TYPE_OFFLINE)) {
-			ProviderContext provContext = new ProviderContext();
-			provContext.getSuppliedKeyProviderContext().setSignatureProvider(ecKeyStore.getKeystoreProviderName());
-			// Note: COSESigner doesn't have setProviderContext method, so we rely on the key's provider
-		}
-		
-		byte[] signature = signer.sign(sigStructure, algorithm);
 		
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"CBOR signing completed. Signature length: {} bytes", signature.length);

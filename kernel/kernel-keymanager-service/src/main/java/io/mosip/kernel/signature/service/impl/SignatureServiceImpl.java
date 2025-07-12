@@ -1353,13 +1353,13 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		
 		// Try direct COSE verification
 		try {
-			LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+			LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 					"Attempting COSE verification with provider: {}, public key algorithm: {}", 
 					providerName, publicKey.getAlgorithm());
 			
 			COSEVerifier verifier = new COSEVerifier(publicKey);
 			valid = verifier.verify(sign1);
-			LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+			LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 					"Direct COSE verification result: {}", valid);
 		} catch (Exception e) {
 			LOGGER.warn(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
@@ -1372,17 +1372,17 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				if (providerName != null && providerName.toLowerCase().contains("pkcs11")) {
 					// PKCS#11 provider (SoftHSM2) - use default provider for better compatibility
 					sig = java.security.Signature.getInstance("SHA256withECDSA");
-					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 							"Using default provider for PKCS#11 (SoftHSM2) verification");
 				} else if (providerName != null && providerName.toLowerCase().contains("luna")) {
 					// Luna HSM - try multiple approaches due to sensitive attributes issue
-					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 							"Luna HSM detected, trying multiple verification approaches");
 					
 					// Try with Luna provider first
 					try {
 						sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
-						LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+						LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 								"Using Luna provider for verification");
 					} catch (Exception lunaException) {
 						LOGGER.warn(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
@@ -1393,12 +1393,12 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				} else if (providerName != null && providerName.toLowerCase().contains("jce")) {
 					// JCE provider (Luna HSM) - use the specific provider
 					sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
-					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 							"Using JCE provider (Luna HSM) for verification");
 				} else {
 					// Other providers - use default
 					sig = java.security.Signature.getInstance("SHA256withECDSA");
-					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 							"Using default provider for verification");
 				}
 				
@@ -1417,13 +1417,13 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 						.payload(payload)
 						.build();
 				
-				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 						"Signature structure reconstructed. Payload length: {} bytes, Algorithm: {}", 
 						payloadBytes.length, protectedHeader.getAlg());
 				
 				// Log the signature structure details for debugging
 				byte[] sigStructureBytes = sigStructure.encode();
-				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 						"Signature structure details - Header: {}, Payload hash: {}", 
 						Hex.encodeHexString(sigStructureBytes).substring(0, Math.min(32, sigStructureBytes.length * 2)),
 						Hex.encodeHexString(payloadBytes).substring(0, Math.min(32, payloadBytes.length * 2)));
@@ -1432,13 +1432,13 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				sig.update(sigStructure.encode());
 				byte[] signatureBytes = sign1.getSignature().getValue();
 				
-				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 						"Signature verification parameters - Signature length: {} bytes, Structure length: {} bytes", 
 						signatureBytes.length, sigStructure.encode().length);
 				
 				valid = sig.verify(signatureBytes);
 				
-				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 						"Alternative verification result: {}", valid);
 			} catch (Exception altException) {
 				LOGGER.error(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
@@ -1456,10 +1456,14 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		long exp = date.getTime() / 1000;
 		long currentTime = Instant.now().getEpochSecond();
 		
-		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 				"Token expiry check. Expiry: {}, Current: {}, Valid: {}", exp, currentTime, exp > currentTime);
 		
-		return valid && (exp > currentTime);
+		boolean finalResult = valid && (exp > currentTime);
+		LOGGER.info(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+				"Final verification result: {} (signature: {}, expiry: {})", finalResult, valid, exp > currentTime);
+		
+		return finalResult;
 	}
 	
 	/**

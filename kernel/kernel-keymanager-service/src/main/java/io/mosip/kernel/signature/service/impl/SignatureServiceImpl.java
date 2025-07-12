@@ -1251,7 +1251,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				usedAlternativeSigning = true;
 				
 				LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
-						"Alternative signing successful with provider: {}", providerName);
+						"Alternative signing successful with provider: {}, algorithm: {}, signature length: {} bytes", 
+						providerName, sig.getAlgorithm(), signature.length);
 			} catch (Exception altException) {
 				LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 						"Both signing approaches failed with provider {}. Original: {}, Alternative: {}", 
@@ -1416,9 +1417,25 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 						.payload(payload)
 						.build();
 				
+				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+						"Signature structure reconstructed. Payload length: {} bytes, Algorithm: {}", 
+						payloadBytes.length, protectedHeader.getAlg());
+				
+				// Log the signature structure details for debugging
+				byte[] sigStructureBytes = sigStructure.encode();
+				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+						"Signature structure details - Header: {}, Payload hash: {}", 
+						Hex.encodeHexString(sigStructureBytes).substring(0, Math.min(32, sigStructureBytes.length * 2)),
+						Hex.encodeHexString(payloadBytes).substring(0, Math.min(32, payloadBytes.length * 2)));
+				
 				sig.initVerify(publicKey);
 				sig.update(sigStructure.encode());
 				byte[] signatureBytes = sign1.getSignature().getValue();
+				
+				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+						"Signature verification parameters - Signature length: {} bytes, Structure length: {} bytes", 
+						signatureBytes.length, sigStructure.encode().length);
+				
 				valid = sig.verify(signatureBytes);
 				
 				LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
@@ -1426,7 +1443,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			} catch (Exception altException) {
 				LOGGER.error(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 						"Both verification approaches failed with provider {}. Original: {}, Alternative: {}", 
-						providerName, e.getMessage(), altException.getMessage());
+						providerName, e.getMessage(), altException.getMessage(), altException);
 				valid = false;
 			}
 		}

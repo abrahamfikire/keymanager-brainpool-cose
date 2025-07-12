@@ -995,10 +995,13 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			
 			responseDto.setSignatureValid(valid);
 			responseDto.setMessage(valid ? "Validation successful" : "Validation failed");
-			responseDto.setTrustValid(valid);
+			
+			// Trust validation - use the same approach as JWT
+			String trustResult = validateCborTrust(cborSignatureVerifyRequestDto, null, null);
+			responseDto.setTrustValid(SignatureConstant.TRUST_VALID.equals(trustResult));
 			
 			LOGGER.info(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
-					"CBOR verification completed. Result: {}", valid ? "VALID" : "INVALID");
+					"CBOR verification completed. Result: {}, Trust: {}", valid ? "VALID" : "INVALID", trustResult);
 			
 		} catch (DecoderException e) {
 			LOGGER.error(sessionId, "CBOR_VERIFY", SignatureConstant.BLANK,
@@ -1346,6 +1349,38 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		public boolean isAvailable() {
 			return true;
 		}
+	}
+
+	private String validateCborTrust(CBORSignatureVerifyRequestDto cborVerifyRequestDto, Certificate headerCertificate, String reqCertData) {
+		boolean validateTrust = SignatureUtil.isIncludeAttrsValid(cborVerifyRequestDto.getValidateTrust());
+		if (!validateTrust) {
+			return SignatureConstant.TRUST_NOT_VERIFIED;
+		}
+
+		String domain = cborVerifyRequestDto.getDomain();
+		if(!SignatureUtil.isDataValid(domain))
+			return SignatureConstant.TRUST_NOT_VERIFIED_NO_DOMAIN;
+
+		String certData = null;
+		if (Objects.nonNull(headerCertificate)) {
+			certData = keymanagerUtil.getPEMFormatedData(headerCertificate);
+		}
+		String trustCertData = certData == null ? reqCertData : certData;
+
+		if (trustCertData == null)
+			return SignatureConstant.TRUST_NOT_VERIFIED;
+
+		CertificateTrustRequestDto trustRequestDto = new CertificateTrustRequestDto();
+		trustRequestDto.setCertificateData(trustCertData);
+		trustRequestDto.setPartnerDomain(domain);
+		CertificateTrustResponeDto responseDto = partnerCertManagerService.verifyCertificateTrust(trustRequestDto);
+
+		if (responseDto.getStatus()){
+			return SignatureConstant.TRUST_VALID;
+		}
+		LOGGER.info(SignatureConstant.SESSIONID, "CBOR_VERIFY", SignatureConstant.BLANK,
+				"CBOR Signature Verification Request - Trust Validation - Completed.");
+		return SignatureConstant.TRUST_NOT_VALID;
 	}
 
 }

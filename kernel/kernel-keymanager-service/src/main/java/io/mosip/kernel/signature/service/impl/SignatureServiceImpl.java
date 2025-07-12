@@ -1185,6 +1185,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		// BACKUP: Original complex fallback approach (WORKING with HSM)
 		byte[] signature;
 		String providerName = ecKeyStore.getKeystoreProviderName();
+		boolean usedAlternativeSigning = false;
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"Using provider: {} for signing", providerName);
 		
@@ -1222,6 +1223,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				sig.initSign(privateKey);
 				sig.update(sigStructure.encode());
 				signature = sig.sign();
+				usedAlternativeSigning = true;
 				
 				LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 						"Alternative signing successful with provider: {}", providerName);
@@ -1234,7 +1236,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		}
 		
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
-				"CBOR signing completed. Signature length: {} bytes", signature.length);
+				"CBOR signing completed. Signature length: {} bytes, Used alternative signing: {}", 
+				signature.length, usedAlternativeSigning);
 		
 		COSESign1 sign1 = new COSESign1Builder()
 				.protectedHeader(protectedHeader)
@@ -1269,11 +1272,12 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
 		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
 		PublicKey publicKey = cert.getPublicKey(); // Use generic PublicKey like JWT verification
+		String providerName = certificateResponse.getProviderName();
 		
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
-				"Certificate retrieved and validated. Starting verification");
+				"Certificate retrieved and validated. Provider: {}, Key algorithm: {}", 
+				providerName, publicKey.getAlgorithm());
 		
-		COSEVerifier verifier = new COSEVerifier(publicKey);
 		byte[] encodedCWT = Hex.decodeHex(cwtSignedData.toCharArray());
 		
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
@@ -1286,7 +1290,20 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 				"CWT decoded successfully. Starting signature verification");
 		
-		boolean valid = verifier.verify(sign1);
+		boolean valid = false;
+		
+		// Try direct COSE verification
+		try {
+			COSEVerifier verifier = new COSEVerifier(publicKey);
+			valid = verifier.verify(sign1);
+			LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					"Direct COSE verification result: {}", valid);
+		} catch (Exception e) {
+			LOGGER.error(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+					"Direct COSE verification failed with provider {}: {}", 
+					providerName, e.getMessage(), e);
+			valid = false;
+		}
 		
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 				"Signature verification result: {}", valid);

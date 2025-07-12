@@ -1217,6 +1217,22 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 					sig = java.security.Signature.getInstance("SHA256withECDSA");
 					LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 							"Using default provider for PKCS#11 (SoftHSM2) signing");
+				} else if (providerName != null && providerName.toLowerCase().contains("luna")) {
+					// Luna HSM - try multiple approaches due to sensitive attributes issue
+					LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+							"Luna HSM detected, trying multiple signing approaches");
+					
+					// Try with Luna provider first
+					try {
+						sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
+						LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+								"Using Luna provider for signing");
+					} catch (Exception lunaException) {
+						LOGGER.warn(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+								"Luna provider failed: {}, trying default provider", lunaException.getMessage());
+						// Fallback to default provider for Luna
+						sig = java.security.Signature.getInstance("SHA256withECDSA");
+					}
 				} else if (providerName != null && providerName.toLowerCase().contains("jce")) {
 					// JCE provider (Luna HSM) - use the specific provider
 					sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
@@ -1240,7 +1256,29 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 						"Both signing approaches failed with provider {}. Original: {}, Alternative: {}", 
 						providerName, e.getMessage(), altException.getMessage());
-				throw new RuntimeException("Failed to sign with HSM key (provider: " + providerName + ")", altException);
+				
+				// For Luna HSM, try one more approach with different algorithm
+				if (providerName != null && (providerName.toLowerCase().contains("luna") || 
+					altException.getMessage().contains("Cannot access sensitive attributes"))) {
+					try {
+						LOGGER.warn(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+								"Trying ECDSA without SHA256 for Luna HSM compatibility");
+						java.security.Signature sig = java.security.Signature.getInstance("ECDSA");
+						sig.initSign(privateKey);
+						sig.update(sigStructure.encode());
+						signature = sig.sign();
+						usedAlternativeSigning = true;
+						
+						LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+								"ECDSA signing successful for Luna HSM");
+					} catch (Exception ecdsaException) {
+						LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+								"All Luna HSM signing approaches failed. ECDSA: {}", ecdsaException.getMessage());
+						throw new RuntimeException("Failed to sign with Luna HSM key (provider: " + providerName + ")", ecdsaException);
+					}
+				} else {
+					throw new RuntimeException("Failed to sign with HSM key (provider: " + providerName + ")", altException);
+				}
 			}
 		}
 		
@@ -1335,6 +1373,22 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 					sig = java.security.Signature.getInstance("SHA256withECDSA");
 					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 							"Using default provider for PKCS#11 (SoftHSM2) verification");
+				} else if (providerName != null && providerName.toLowerCase().contains("luna")) {
+					// Luna HSM - try multiple approaches due to sensitive attributes issue
+					LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+							"Luna HSM detected, trying multiple verification approaches");
+					
+					// Try with Luna provider first
+					try {
+						sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
+						LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+								"Using Luna provider for verification");
+					} catch (Exception lunaException) {
+						LOGGER.warn(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
+								"Luna provider failed: {}, trying default provider", lunaException.getMessage());
+						// Fallback to default provider for Luna
+						sig = java.security.Signature.getInstance("SHA256withECDSA");
+					}
 				} else if (providerName != null && providerName.toLowerCase().contains("jce")) {
 					// JCE provider (Luna HSM) - use the specific provider
 					sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);

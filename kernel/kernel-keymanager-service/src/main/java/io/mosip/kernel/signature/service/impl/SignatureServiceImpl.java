@@ -202,6 +202,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 	@PostConstruct
 	public void init() {
 		KeyGeneratorUtils.loadClazz();
+		// Add BouncyCastle provider for SoftHSM2 compatibility
+		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 		if (enableSecp256k1Algo) {
 			AlgorithmFactory<JsonWebSignatureAlgorithm> jwsAlgorithmFactory =
 					AlgorithmFactoryFactory.getInstance().getJwsAlgorithmFactory();
@@ -1161,11 +1163,75 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"Signature structure created. Starting signing process");
 		
+		// BACKUP: Original complex fallback approach
+		/*
+		byte[] signature;
+		String providerName = ecKeyStore.getKeystoreProviderName();
+		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Using provider: {} for signing", providerName);
+		
+		try {
+			// Try using COSESigner with generic PrivateKey first
+			COSESigner signer = new COSESigner(privateKey);
+			signature = signer.sign(sigStructure, algorithm);
+			LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"Direct COSE signing successful with provider: {}", providerName);
+		} catch (Exception e) {
+			LOGGER.warn(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+					"Direct COSE signing failed with provider {}, trying alternative approach: {}", 
+					providerName, e.getMessage());
+			
+			// Alternative: Use Java's Signature class with provider-specific configuration
+			try {
+				java.security.Signature sig;
+				if (providerName != null && providerName.toLowerCase().contains("pkcs11")) {
+					// PKCS#11 provider (SoftHSM2) - use default provider for better compatibility
+					sig = java.security.Signature.getInstance("SHA256withECDSA");
+					LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+							"Using default provider for PKCS#11 (SoftHSM2) signing");
+				} else if (providerName != null && providerName.toLowerCase().contains("jce")) {
+					// JCE provider (Luna HSM) - use the specific provider
+					sig = java.security.Signature.getInstance("SHA256withECDSA", providerName);
+					LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+							"Using JCE provider (Luna HSM) for signing");
+				} else {
+					// Other providers - use default
+					sig = java.security.Signature.getInstance("SHA256withECDSA");
+					LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+							"Using default provider for signing");
+				}
+				
+				sig.initSign(privateKey);
+				sig.update(sigStructure.encode());
+				signature = sig.sign();
+				
+				LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+						"Alternative signing successful with provider: {}", providerName);
+			} catch (Exception altException) {
+				LOGGER.error(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+						"Both signing approaches failed with provider {}. Original: {}, Alternative: {}", 
+						providerName, e.getMessage(), altException.getMessage());
+				throw new RuntimeException("Failed to sign with HSM key (provider: " + providerName + ")", altException);
+			}
+		}
+		*/
+		
+		// CURRENT: Simplified approach following JWT signing pattern
+		// Use the same approach as JWT signing with EC keys
 		COSESigner signer = new COSESigner(privateKey);
+		
+		// Set provider context like JWT signing does
+		if (!ecKeyStore.getKeystoreProviderName().equals(
+				io.mosip.kernel.keymanager.hsm.constant.KeymanagerConstant.KEYSTORE_TYPE_OFFLINE)) {
+			ProviderContext provContext = new ProviderContext();
+			provContext.getSuppliedKeyProviderContext().setSignatureProvider(ecKeyStore.getKeystoreProviderName());
+			// Note: COSESigner doesn't have setProviderContext method, so we rely on the key's provider
+		}
+		
 		byte[] signature = signer.sign(sigStructure, algorithm);
 		
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
-				"Signature created. Signature length: {} bytes", signature.length);
+				"CBOR signing completed. Signature length: {} bytes", signature.length);
 		
 		COSESign1 sign1 = new COSESign1Builder()
 				.protectedHeader(protectedHeader)
@@ -1199,12 +1265,12 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
 		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
-		ECPublicKey ecPublicKey = (ECPublicKey) cert.getPublicKey();
+		PublicKey publicKey = cert.getPublicKey(); // Use generic PublicKey like JWT verification
 		
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,
 				"Certificate retrieved and validated. Starting verification");
 		
-		COSEVerifier verifier = new COSEVerifier(ecPublicKey);
+		COSEVerifier verifier = new COSEVerifier(publicKey);
 		byte[] encodedCWT = Hex.decodeHex(cwtSignedData.toCharArray());
 		
 		LOGGER.debug(sessionId, "CBOR_VERIFY_INTERNAL", SignatureConstant.BLANK,

@@ -129,6 +129,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PostMapping;
 import javax.validation.Valid;
 import org.springframework.web.bind.annotation.ResponseBody;
+import io.mosip.kernel.core.http.RequestWrapper;
+import io.mosip.kernel.core.http.ResponseWrapper;
+import io.mosip.kernel.signature.dto.SignRawMessageRequestDto;
+import io.mosip.kernel.signature.dto.SignRawMessageResponseDto;
+import io.mosip.kernel.signature.dto.VerifyRawMessageRequestDto;
+import io.mosip.kernel.signature.dto.VerifyRawMessageResponseDto;
 
 
 /**
@@ -1655,6 +1661,45 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			throw new SignatureFailureException(SignatureErrorCode.VERIFY_ERROR.getErrorCode(),
 					SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
 		}
+	}
+
+	@ResponseBody
+	@PostMapping("/signRawMessage")
+	@ApiOperation(value = "Sign a raw message using ECDSA", notes = "Signs a message using the HSM-backed key for the given application and reference ID.")
+	public ResponseWrapper<SignRawMessageResponseDto> signRawMessage(
+			@RequestBody @Valid RequestWrapper<SignRawMessageRequestDto> requestDto) {
+		byte[] signature = signRawMessage(
+				requestDto.getRequest().getMessage(),
+				requestDto.getRequest().getApplicationId(),
+				requestDto.getRequest().getReferenceId()
+		);
+		String signatureBase64 = java.util.Base64.getEncoder().encodeToString(signature);
+		SignRawMessageResponseDto responseDto = new SignRawMessageResponseDto();
+		responseDto.setSignature(signatureBase64);
+		responseDto.setTimestamp(io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString());
+		ResponseWrapper<SignRawMessageResponseDto> response = new ResponseWrapper<>();
+		response.setResponse(responseDto);
+		return response;
+	}
+
+	@ResponseBody
+	@PostMapping("/verifyRawMessage")
+	@ApiOperation(value = "Verify a raw message signature using ECDSA", notes = "Verifies a message signature using the HSM-backed key for the given application and reference ID.")
+	public ResponseWrapper<VerifyRawMessageResponseDto> verifyRawMessage(
+			@RequestBody @Valid RequestWrapper<VerifyRawMessageRequestDto> requestDto) {
+		boolean valid = verifyRawMessage(
+				requestDto.getRequest().getMessage(),
+				java.util.Base64.getDecoder().decode(requestDto.getRequest().getSignature()),
+				requestDto.getRequest().getApplicationId(),
+				requestDto.getRequest().getReferenceId()
+		);
+		VerifyRawMessageResponseDto responseDto = new VerifyRawMessageResponseDto();
+		responseDto.setValid(valid);
+		responseDto.setMessage(valid ? "Signature valid" : "Signature invalid");
+		responseDto.setTimestamp(io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString());
+		ResponseWrapper<VerifyRawMessageResponseDto> response = new ResponseWrapper<>();
+		response.setResponse(responseDto);
+		return response;
 	}
 
 }

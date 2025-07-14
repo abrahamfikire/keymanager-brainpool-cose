@@ -119,6 +119,17 @@ import com.authlete.cbor.CBORMalformedUtf8Exception;
 import com.authlete.cbor.CBORInsufficientDataException;
 import org.bouncycastle.asn1.*;
 import java.math.BigInteger;
+import java.security.InvalidKeyException;
+import java.security.SignatureException;
+import java.security.Signature;
+import java.security.NoSuchProviderException;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
+import javax.validation.Valid;
+import org.springframework.web.bind.annotation.ResponseBody;
+
 
 /**
  * @author Uday Kumar
@@ -1594,6 +1605,56 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		byte[] result = new byte[length];
 		System.arraycopy(bytes, Math.max(0, bytes.length - length), result, Math.max(0, length - bytes.length), Math.min(length, bytes.length));
 		return result;
+	}
+
+	public byte[] signRawMessage(String message, String applicationId, String referenceId) {
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String providerName = certificateResponse.getProviderName();
+
+		try {
+			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName);
+			return signature;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException | NoSuchProviderException e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "RAW_SIGN", SignatureConstant.BLANK, "Error signing message", e);
+			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+					SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	public static byte[] signMessage(String message, PrivateKey privateKey, String providerName)
+			throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
+		Signature signature = (providerName != null && !providerName.isEmpty())
+				? Signature.getInstance("SHA256withECDSA", providerName)
+				: Signature.getInstance("SHA256withECDSA");
+		signature.initSign(privateKey);
+		signature.update(message.getBytes(StandardCharsets.UTF_8));
+		return signature.sign();
+	}
+
+	public static boolean verifyMessage(String message, byte[] signatureBytes, PublicKey publicKey, String providerName)
+			throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
+		Signature signature = (providerName != null && !providerName.isEmpty())
+				? Signature.getInstance("SHA256withECDSA", providerName)
+				: Signature.getInstance("SHA256withECDSA");
+		signature.initVerify(publicKey);
+		signature.update(message.getBytes(StandardCharsets.UTF_8));
+		return signature.verify(signatureBytes);
+	}
+
+	public boolean verifyRawMessage(String message, byte[] signatureBytes, String applicationId, String referenceId) {
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			return SignatureUtil.verifyMessage(message, signatureBytes, publicKey, providerName);
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException | NoSuchProviderException e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "RAW_VERIFY", SignatureConstant.BLANK, "Error verifying message", e);
+			throw new SignatureFailureException(SignatureErrorCode.VERIFY_ERROR.getErrorCode(),
+					SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
+		}
 	}
 
 }

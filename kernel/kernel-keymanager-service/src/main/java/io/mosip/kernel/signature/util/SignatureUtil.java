@@ -4,7 +4,11 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -15,6 +19,9 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Objects;
 import java.util.List;
+import java.security.SecureRandom;
+import java.security.PublicKey;
+import java.security.NoSuchProviderException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -34,6 +41,9 @@ import io.mosip.kernel.core.util.DateUtils;
 import io.mosip.kernel.core.util.HMACUtils2;
 import io.mosip.kernel.keymanagerservice.logger.KeymanagerLogger;
 import io.mosip.kernel.signature.constant.SignatureConstant;
+import org.jose4j.jws.EcdsaUsingShaAlgorithm;
+import io.mosip.kernel.signature.constant.SignatureErrorCode;
+import io.mosip.kernel.signature.exception.SignatureFailureException;
 /**
  * Utility class for Signature Service
  * 
@@ -177,6 +187,89 @@ public class SignatureUtil {
 		}
 		return null;
 	}
+
+    /**
+     * Signs a message using the provided ECDSA private key and SHA-256, with provider.
+     *
+     * @param message      The message to sign (as a String, UTF-8).
+     * @param privateKey   The ECDSA private key (HSM-backed or otherwise).
+     * @param providerName The JCA provider name (e.g., "SunPKCS11-Luna"), or null for default.
+     * @return The signature as a byte array (DER-encoded).
+     */
+    public static byte[] signMessage(String message, PrivateKey privateKey, String providerName)
+            throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
+        Signature signature = (providerName != null && !providerName.isEmpty())
+                ? Signature.getInstance("SHA256withECDSA", providerName)
+                : Signature.getInstance("SHA256withECDSA");
+        signature.initSign(privateKey);
+        signature.update(message.getBytes(StandardCharsets.UTF_8));
+        return signature.sign();
+    }
+
+    /**
+     * Signs binary data using the provided ECDSA private key and SHA-256.
+     * Returns the raw (r||s) signature as a byte array (for COSE/JWS).
+     *
+     * @param data         The data to sign.
+     * @param privateKey   The ECDSA private key (HSM-backed or otherwise).
+     * @param providerName The JCA provider name (e.g., "SunPKCS11-Luna"), or null for default.
+     * @return The raw (r||s) signature as a byte array.
+     */
+    public static byte[] signMessage(byte[] data, PrivateKey privateKey, String providerName) {
+        try {
+            Signature signature;
+            if (Objects.nonNull(providerName) && !providerName.isEmpty()) {
+                signature = Signature.getInstance(SignatureConstant.EC256_ALGORITHM, providerName);
+            } else {
+                signature = Signature.getInstance(SignatureConstant.EC256_ALGORITHM);
+            }
+            signature.initSign(privateKey, new SecureRandom());
+            signature.update(data);
+            byte[] derSignature = signature.sign();
+            // Convert DER to raw (r||s) for COSE/JWS
+            return EcdsaUsingShaAlgorithm.convertDerToConcatenated(derSignature, SignatureConstant.EC256_SIGNATURE_LENGTH);
+        } catch (Exception e) {
+            LOGGER.error(SignatureConstant.SESSIONID, SignatureConstant.JWS_SIGN, SignatureConstant.BLANK,
+                    "Error while signing the data.", e);
+            throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+                    SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+        }
+    }
+
+    /**
+     * Verifies a message using the provided ECDSA public key and SHA-256.
+     *
+     * @param message        The original message (as a String, UTF-8).
+     * @param signatureBytes The signature to verify (DER-encoded).
+     * @param publicKey      The ECDSA public key.
+     * @return true if the signature is valid, false otherwise.
+     */
+    public static boolean verifyMessage(String message, byte[] signatureBytes, java.security.PublicKey publicKey)
+            throws java.security.NoSuchAlgorithmException, java.security.InvalidKeyException, java.security.SignatureException {
+        Signature signature = Signature.getInstance("SHA256withECDSA");
+        signature.initVerify(publicKey);
+        signature.update(message.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return signature.verify(signatureBytes);
+    }
+
+    /**
+     * Verifies a message using the provided ECDSA public key and SHA-256, with provider.
+     *
+     * @param message        The original message (as a String, UTF-8).
+     * @param signatureBytes The signature to verify (DER-encoded).
+     * @param publicKey      The ECDSA public key.
+     * @param providerName   The JCA provider name (e.g., "SunPKCS11-Luna"), or null for default.
+     * @return true if the signature is valid, false otherwise.
+     */
+    public static boolean verifyMessage(String message, byte[] signatureBytes, PublicKey publicKey, String providerName)
+            throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
+        Signature signature = (providerName != null && !providerName.isEmpty())
+                ? Signature.getInstance("SHA256withECDSA", providerName)
+                : Signature.getInstance("SHA256withECDSA");
+        signature.initVerify(publicKey);
+        signature.update(message.getBytes(StandardCharsets.UTF_8));
+        return signature.verify(signatureBytes);
+    }
 
 
 }

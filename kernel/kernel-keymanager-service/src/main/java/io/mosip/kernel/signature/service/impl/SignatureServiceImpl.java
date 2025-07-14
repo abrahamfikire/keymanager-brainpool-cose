@@ -117,6 +117,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.authlete.cbor.CBORMalformedUtf8Exception;
 import com.authlete.cbor.CBORInsufficientDataException;
+import org.bouncycastle.asn1.*;
+import java.math.BigInteger;
 
 /**
  * @author Uday Kumar
@@ -1202,6 +1204,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			// Try using COSESigner with generic PrivateKey first
 			COSESigner signer = new COSESigner(privateKey);
 			signature = signer.sign(sigStructure, algorithm);
+			if (signature.length != 64) { // 64 bytes for P-256
+				signature = derToRaw(signature, 32);
+			}
 			LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 					"Direct COSE signing successful with provider: {}", providerName);
 		} catch (Exception e) {
@@ -1248,6 +1253,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				sig.initSign(privateKey);
 				sig.update(sigStructure.encode());
 				signature = sig.sign();
+				if (signature.length != 64) { // 64 bytes for P-256
+					signature = derToRaw(signature, 32);
+				}
 				usedAlternativeSigning = true;
 				
 				LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
@@ -1268,6 +1276,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 						sig.initSign(privateKey);
 						sig.update(sigStructure.encode());
 						signature = sig.sign();
+						if (signature.length != 64) { // 64 bytes for P-256
+							signature = derToRaw(signature, 32);
+						}
 						usedAlternativeSigning = true;
 						
 						LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
@@ -1306,6 +1317,11 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		
 		LOGGER.debug(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
 				"CBOR signing completed. Final hex length: {}", result.length());
+		
+		LOGGER.info(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Signature hex: {}", org.apache.commons.codec.binary.Hex.encodeHexString(signature));
+		LOGGER.info(sessionId, "CBOR_SIGN_INTERNAL", SignatureConstant.BLANK,
+				"Signature length: {}", signature.length);
 		
 		return result;
 	}
@@ -1557,6 +1573,27 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		LOGGER.info(SignatureConstant.SESSIONID, "CBOR_VERIFY", SignatureConstant.BLANK,
 				"CBOR Signature Verification Request - Trust Validation - Completed.");
 		return SignatureConstant.TRUST_NOT_VALID;
+	}
+
+	// Add this utility method (use BouncyCastle)
+	public static byte[] derToRaw(byte[] der, int keySizeBytes) throws IOException {
+		ASN1Sequence seq = (ASN1Sequence) ASN1Primitive.fromByteArray(der);
+		BigInteger r = ((ASN1Integer) seq.getObjectAt(0)).getValue();
+		BigInteger s = ((ASN1Integer) seq.getObjectAt(1)).getValue();
+		byte[] rBytes = toFixedLength(r, keySizeBytes);
+		byte[] sBytes = toFixedLength(s, keySizeBytes);
+		byte[] raw = new byte[keySizeBytes * 2];
+		System.arraycopy(rBytes, 0, raw, 0, keySizeBytes);
+		System.arraycopy(sBytes, 0, raw, keySizeBytes, keySizeBytes);
+		return raw;
+	}
+
+	private static byte[] toFixedLength(BigInteger b, int length) {
+		byte[] bytes = b.toByteArray();
+		if (bytes.length == length) return bytes;
+		byte[] result = new byte[length];
+		System.arraycopy(bytes, Math.max(0, bytes.length - length), result, Math.max(0, length - bytes.length), Math.min(length, bytes.length));
+		return result;
 	}
 
 }

@@ -19,6 +19,7 @@ import io.mosip.kernel.signature.dto.CBORSignatureRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureResponseDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
+import io.mosip.kernel.signature.dto.SignCredentialRequestDto;
 
 public interface SignatureService {
 	/**
@@ -117,4 +118,11 @@ public interface SignatureService {
      * @return true if valid, false otherwise
      */
     boolean verifyBinary(byte[] data, byte[] signatureBytes, String applicationId, String referenceId);
+
+    /**
+     * Signs a credential message using the application's private key.
+     * @param requestDto the request containing message, applicationId, referenceId
+     * @return the signature response dto
+     */
+    SignatureResponseDto signCredential(io.mosip.kernel.signature.dto.SignCredentialRequestDto requestDto);
 }

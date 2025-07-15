@@ -1735,4 +1735,36 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		}
 	}
 
+	@Override
+	public SignatureResponseDto signCredential(io.mosip.kernel.signature.dto.SignCredentialRequestDto requestDto) {
+		String message = requestDto.getMessage();
+		String applicationId = requestDto.getApplicationId();
+		String referenceId = requestDto.getReferenceId();
+		String timestamp = io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString();
+		io.mosip.kernel.keymanagerservice.dto.SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, java.util.Optional.of(referenceId), timestamp);
+		java.security.PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		try {
+			byte[] signature = signMessage(message, privateKey);
+			String signatureBase64 = org.apache.commons.codec.binary.Base64.encodeBase64String(signature);
+			return new io.mosip.kernel.signature.dto.SignatureResponseDto(signatureBase64);
+		} catch (java.security.NoSuchAlgorithmException | java.security.InvalidKeyException | java.security.SignatureException e) {
+			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorCode(), io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	/**
+	 * Signs a message using SHA256withECDSA and the provided private key.
+	 * @param message the message to sign
+	 * @param privateKey the private key
+	 * @return the DER-encoded signature
+	 */
+	public static byte[] signMessage(String message, java.security.PrivateKey privateKey)
+			throws java.security.NoSuchAlgorithmException, java.security.InvalidKeyException, java.security.SignatureException {
+		java.security.Signature signature = java.security.Signature.getInstance("SHA256withECDSA");
+		signature.initSign(privateKey);
+		signature.update(message.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+		return signature.sign();
+	}
+
 }

@@ -1736,20 +1736,21 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 	}
 
 	@Override
-	public SignatureResponseDto signCredential(io.mosip.kernel.signature.dto.SignCredentialRequestDto requestDto) {
+	public SignatureResponseDto signCredential(SignCredentialRequestDto requestDto) {
 		String message = requestDto.getMessage();
 		String applicationId = requestDto.getApplicationId();
 		String referenceId = requestDto.getReferenceId();
-		String timestamp = io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString();
-		io.mosip.kernel.keymanagerservice.dto.SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, java.util.Optional.of(referenceId), timestamp);
-		java.security.PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
 		try {
-			byte[] signature = signMessage(message, privateKey);
-			String signatureBase64 = org.apache.commons.codec.binary.Base64.encodeBase64String(signature);
-			return new io.mosip.kernel.signature.dto.SignatureResponseDto(signatureBase64);
-		} catch (java.security.NoSuchAlgorithmException | java.security.InvalidKeyException | java.security.SignatureException e) {
+			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName); // <-- use provider
+			String signatureBase64 = Base64.encodeBase64String(signature);
+			return new SignatureResponseDto(signatureBase64);
+		} catch (Exception e) {
 			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);
-			throw new io.mosip.kernel.signature.exception.SignatureFailureException(io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorCode(), io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(), SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
 		}
 	}
 
@@ -1765,6 +1766,25 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		signature.initSign(privateKey);
 		signature.update(message.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 		return signature.sign();
+	}
+
+	@Override
+	public boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto) {
+		String message = requestDto.getMessage();
+		String signatureBase64 = requestDto.getSignature();
+		String applicationId = requestDto.getApplicationId();
+		String referenceId = requestDto.getReferenceId();
+		String timestamp = io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString();
+		io.mosip.kernel.keymanagerservice.dto.SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, java.util.Optional.of(referenceId), timestamp);
+		java.security.PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			byte[] signatureBytes = org.apache.commons.codec.binary.Base64.decodeBase64(signatureBase64);
+			return io.mosip.kernel.signature.util.SignatureUtil.verifyMessage(message, signatureBytes, publicKey, providerName);
+		} catch (Exception e) {
+			LOGGER.error("verifyCredential", "VERIFY_CREDENTIAL", "", "Error verifying credential signature", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorCode(), io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
+		}
 	}
 
 }

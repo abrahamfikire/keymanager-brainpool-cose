@@ -354,4 +354,15 @@ public ResponseWrapper<VerifyBinaryResponseDto> verifyBinary(
         response.setResponse(responseDto);
         return response;
     }
+
+    @ResponseBody
+    @PostMapping("/verifyCredential")
+    @ApiOperation(value = "Verify a credential signature using ECDSA", notes = "Verifies a credential signature using the HSM-backed key for the given application and reference ID.")
+    public io.mosip.kernel.core.http.ResponseWrapper<Boolean> verifyCredential(
+            @RequestBody @Valid io.mosip.kernel.core.http.RequestWrapper<io.mosip.kernel.signature.dto.VerifyCredentialRequestDto> requestDto) {
+        boolean valid = service.verifyCredential(requestDto.getRequest());
+        io.mosip.kernel.core.http.ResponseWrapper<Boolean> response = new io.mosip.kernel.core.http.ResponseWrapper<>();
+        response.setResponse(valid);
+        return response;
+    }
 }

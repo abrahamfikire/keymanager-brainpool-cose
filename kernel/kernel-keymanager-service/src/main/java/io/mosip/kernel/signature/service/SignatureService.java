@@ -20,6 +20,7 @@ import io.mosip.kernel.signature.dto.CBORSignatureResponseDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
 import io.mosip.kernel.signature.dto.SignCredentialRequestDto;
+import io.mosip.kernel.signature.dto.VerifyCredentialRequestDto;
 
 public interface SignatureService {
 	/**
@@ -125,4 +126,11 @@ public interface SignatureService {
      * @return the signature response dto
      */
     SignatureResponseDto signCredential(io.mosip.kernel.signature.dto.SignCredentialRequestDto requestDto);
+
+    /**
+     * Verifies a credential signature using the application's public key.
+     * @param requestDto the request containing message, signature, applicationId, referenceId
+     * @return true if valid, false otherwise
+     */
+    boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto);
 }

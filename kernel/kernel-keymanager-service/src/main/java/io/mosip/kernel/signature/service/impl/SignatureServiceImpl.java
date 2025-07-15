@@ -1639,13 +1639,13 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		return signature.sign();
 	}
 
-	public static boolean verifyMessage(String message, byte[] signatureBytes, PublicKey publicKey, String providerName)
+	public static boolean verifyMessage(byte[] data, byte[] signatureBytes, PublicKey publicKey, String providerName)
 			throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
 		Signature signature = (providerName != null && !providerName.isEmpty())
 				? Signature.getInstance("SHA256withECDSA", providerName)
 				: Signature.getInstance("SHA256withECDSA");
 		signature.initVerify(publicKey);
-		signature.update(message.getBytes(StandardCharsets.UTF_8));
+		signature.update(data);
 		return signature.verify(signatureBytes);
 	}
 
@@ -1700,6 +1700,39 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		ResponseWrapper<VerifyRawMessageResponseDto> response = new ResponseWrapper<>();
 		response.setResponse(responseDto);
 		return response;
+	}
+
+	@Override
+	public byte[] signBinary(byte[] data, String applicationId, String referenceId) {
+		// Use your existing implementation or logic
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			return io.mosip.kernel.signature.util.SignatureUtil.signMessage(data, privateKey, providerName);
+		} catch (Exception e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "BINARY_SIGN", SignatureConstant.BLANK, "Error signing binary data", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(
+				io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+				io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	@Override
+	public boolean verifyBinary(byte[] data, byte[] signatureBytes, String applicationId, String referenceId) {
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			return io.mosip.kernel.signature.util.SignatureUtil.verifyMessage(data, signatureBytes, publicKey, providerName);
+		} catch (Exception e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "BINARY_VERIFY", SignatureConstant.BLANK, "Error verifying binary data", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(
+				io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorCode(),
+				io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
+		}
 	}
 
 }

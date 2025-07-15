@@ -271,5 +271,24 @@ public class SignatureUtil {
         return signature.verify(signatureBytes);
     }
 
+    /**
+     * Verifies binary data using the provided ECDSA public key and SHA-256, with provider.
+     *
+     * @param data           The original data (as a byte array).
+     * @param signatureBytes The signature to verify (DER-encoded).
+     * @param publicKey      The ECDSA public key.
+     * @param providerName   The JCA provider name (e.g., "SunPKCS11-Luna"), or null for default.
+     * @return true if the signature is valid, false otherwise.
+     */
+    public static boolean verifyMessage(byte[] data, byte[] signatureBytes, java.security.PublicKey publicKey, String providerName)
+            throws java.security.NoSuchAlgorithmException, java.security.InvalidKeyException, java.security.SignatureException, java.security.NoSuchProviderException {
+        Signature signature = (providerName != null && !providerName.isEmpty())
+                ? Signature.getInstance("SHA256withECDSA", providerName)
+                : Signature.getInstance("SHA256withECDSA");
+        signature.initVerify(publicKey);
+        signature.update(data);
+        return signature.verify(signatureBytes);
+    }
+
 
 }

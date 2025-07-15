@@ -98,4 +98,23 @@ public interface SignatureService {
      * @return the CBORSignatureVerifyResponseDto
      */
     public CBORSignatureVerifyResponseDto cborVerify(CBORSignatureVerifyRequestDto cborSignatureVerifyRequestDto);
+
+    /**
+     * Signs binary data using the application's private key.
+     * @param data binary data to sign
+     * @param applicationId application id
+     * @param referenceId reference id
+     * @return signature bytes
+     */
+    byte[] signBinary(byte[] data, String applicationId, String referenceId);
+
+    /**
+     * Verifies a signature over binary data using the application's public key.
+     * @param data binary data
+     * @param signatureBytes signature bytes
+     * @param applicationId application id
+     * @param referenceId reference id
+     * @return true if valid, false otherwise
+     */
+    boolean verifyBinary(byte[] data, byte[] signatureBytes, String applicationId, String referenceId);
 }

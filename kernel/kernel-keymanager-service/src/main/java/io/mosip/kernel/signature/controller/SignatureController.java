@@ -35,7 +35,13 @@ import io.mosip.kernel.signature.dto.CBORSignatureRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureResponseDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
+import io.mosip.kernel.signature.dto.SignBinaryRequestDto;
+import io.mosip.kernel.signature.dto.SignBinaryResponseDto;
+import io.mosip.kernel.signature.dto.VerifyBinaryRequestDto;
+import io.mosip.kernel.signature.dto.VerifyBinaryResponseDto;
 import io.mosip.kernel.signature.service.SignatureService;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
  * 
@@ -299,4 +305,42 @@ public class SignatureController {
             throw e;
         }
     }
+
+@ResponseBody
+@PostMapping("/signBinary")
+@ApiOperation(value = "Sign binary data using ECDSA", notes = "Signs binary data (base64-encoded) using the HSM-backed key for the given application and reference ID.")
+public ResponseWrapper<SignBinaryResponseDto> signBinary(
+        @RequestBody @Valid RequestWrapper<SignBinaryRequestDto> requestDto) {
+    byte[] data = java.util.Base64.getDecoder().decode(requestDto.getRequest().getDataBase64());
+    byte[] signature = service.signBinary(data,
+            requestDto.getRequest().getApplicationId(),
+            requestDto.getRequest().getReferenceId());
+    String signatureBase64 = java.util.Base64.getEncoder().encodeToString(signature);
+    SignBinaryResponseDto responseDto = new SignBinaryResponseDto();
+    responseDto.setSignatureBase64(signatureBase64);
+    responseDto.setTimestamp(io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString());
+    ResponseWrapper<SignBinaryResponseDto> response = new ResponseWrapper<>();
+    response.setResponse(responseDto);
+    return response;
+}
+
+@ResponseBody
+@PostMapping("/verifyBinary")
+@ApiOperation(value = "Verify binary data signature using ECDSA", notes = "Verifies a signature (base64-encoded) over binary data (base64-encoded) using the HSM-backed key for the given application and reference ID.")
+public ResponseWrapper<VerifyBinaryResponseDto> verifyBinary(
+        @RequestBody @Valid RequestWrapper<VerifyBinaryRequestDto> requestDto) {
+    byte[] data = java.util.Base64.getDecoder().decode(requestDto.getRequest().getDataBase64());
+    byte[] signature = java.util.Base64.getDecoder().decode(requestDto.getRequest().getSignatureBase64());
+    boolean valid = service.verifyBinary(data,
+            signature,
+            requestDto.getRequest().getApplicationId(),
+            requestDto.getRequest().getReferenceId());
+    VerifyBinaryResponseDto responseDto = new VerifyBinaryResponseDto();
+    responseDto.setValid(valid);
+    responseDto.setMessage(valid ? "Signature valid" : "Signature invalid");
+    responseDto.setTimestamp(io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString());
+    ResponseWrapper<VerifyBinaryResponseDto> response = new ResponseWrapper<>();
+    response.setResponse(responseDto);
+    return response;
+}
 }

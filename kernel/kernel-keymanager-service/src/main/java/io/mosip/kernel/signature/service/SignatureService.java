@@ -19,6 +19,8 @@ import io.mosip.kernel.signature.dto.CBORSignatureRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureResponseDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
+import io.mosip.kernel.signature.dto.SignCredentialRequestDto;
+import io.mosip.kernel.signature.dto.VerifyCredentialRequestDto;
 
 public interface SignatureService {
 	/**
@@ -98,4 +100,37 @@ public interface SignatureService {
      * @return the CBORSignatureVerifyResponseDto
      */
     public CBORSignatureVerifyResponseDto cborVerify(CBORSignatureVerifyRequestDto cborSignatureVerifyRequestDto);
+
+    /**
+     * Signs binary data using the application's private key.
+     * @param data binary data to sign
+     * @param applicationId application id
+     * @param referenceId reference id
+     * @return signature bytes
+     */
+    byte[] signBinary(byte[] data, String applicationId, String referenceId);
+
+    /**
+     * Verifies a signature over binary data using the application's public key.
+     * @param data binary data
+     * @param signatureBytes signature bytes
+     * @param applicationId application id
+     * @param referenceId reference id
+     * @return true if valid, false otherwise
+     */
+    boolean verifyBinary(byte[] data, byte[] signatureBytes, String applicationId, String referenceId);
+
+    /**
+     * Signs a credential message using the application's private key.
+     * @param requestDto the request containing message, applicationId, referenceId
+     * @return the signature response dto
+     */
+    SignatureResponseDto signCredential(io.mosip.kernel.signature.dto.SignCredentialRequestDto requestDto);
+
+    /**
+     * Verifies a credential signature using the application's public key.
+     * @param requestDto the request containing message, signature, applicationId, referenceId
+     * @return true if valid, false otherwise
+     */
+    boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto);
 }

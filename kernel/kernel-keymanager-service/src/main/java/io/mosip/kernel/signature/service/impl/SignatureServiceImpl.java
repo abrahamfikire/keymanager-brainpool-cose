@@ -119,6 +119,23 @@ import com.authlete.cbor.CBORMalformedUtf8Exception;
 import com.authlete.cbor.CBORInsufficientDataException;
 import org.bouncycastle.asn1.*;
 import java.math.BigInteger;
+import java.security.InvalidKeyException;
+import java.security.SignatureException;
+import java.security.Signature;
+import java.security.NoSuchProviderException;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
+import javax.validation.Valid;
+import org.springframework.web.bind.annotation.ResponseBody;
+import io.mosip.kernel.core.http.RequestWrapper;
+import io.mosip.kernel.core.http.ResponseWrapper;
+import io.mosip.kernel.signature.dto.SignRawMessageRequestDto;
+import io.mosip.kernel.signature.dto.SignRawMessageResponseDto;
+import io.mosip.kernel.signature.dto.VerifyRawMessageRequestDto;
+import io.mosip.kernel.signature.dto.VerifyRawMessageResponseDto;
+
 
 /**
  * @author Uday Kumar
@@ -246,7 +263,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			encryptedSignedData = cryptoCore.sign(signatureRequestDto.getData().getBytes(),
 					certificateResponse.getCertificateEntry().getPrivateKey());
 		}
-		return new SignatureResponseDto(encryptedSignedData);
+		SignatureResponseDto responseDto = new SignatureResponseDto();
+		responseDto.setData(encryptedSignedData);
+		return responseDto;
 	}
 
 	@Override
@@ -1594,6 +1613,186 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		byte[] result = new byte[length];
 		System.arraycopy(bytes, Math.max(0, bytes.length - length), result, Math.max(0, length - bytes.length), Math.min(length, bytes.length));
 		return result;
+	}
+
+	public byte[] signRawMessage(String message, String applicationId, String referenceId) {
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String providerName = certificateResponse.getProviderName();
+
+		try {
+			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName);
+			return signature;
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException | NoSuchProviderException e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "RAW_SIGN", SignatureConstant.BLANK, "Error signing message", e);
+			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+					SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	public static byte[] signMessage(String message, PrivateKey privateKey, String providerName)
+			throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
+		Signature signature = (providerName != null && !providerName.isEmpty())
+				? Signature.getInstance("SHA256withECDSA", providerName)
+				: Signature.getInstance("SHA256withECDSA");
+		signature.initSign(privateKey);
+		signature.update(message.getBytes(StandardCharsets.UTF_8));
+		return signature.sign();
+	}
+
+	public static boolean verifyMessage(byte[] data, byte[] signatureBytes, PublicKey publicKey, String providerName)
+			throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, NoSuchProviderException {
+		Signature signature = (providerName != null && !providerName.isEmpty())
+				? Signature.getInstance("SHA256withECDSA", providerName)
+				: Signature.getInstance("SHA256withECDSA");
+		signature.initVerify(publicKey);
+		signature.update(data);
+		return signature.verify(signatureBytes);
+	}
+
+	public boolean verifyRawMessage(String message, byte[] signatureBytes, String applicationId, String referenceId) {
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			return SignatureUtil.verifyMessage(message, signatureBytes, publicKey, providerName);
+		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException | NoSuchProviderException e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "RAW_VERIFY", SignatureConstant.BLANK, "Error verifying message", e);
+			throw new SignatureFailureException(SignatureErrorCode.VERIFY_ERROR.getErrorCode(),
+					SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	@ResponseBody
+	@PostMapping("/signRawMessage")
+	@ApiOperation(value = "Sign a raw message using ECDSA", notes = "Signs a message using the HSM-backed key for the given application and reference ID.")
+	public ResponseWrapper<SignRawMessageResponseDto> signRawMessage(
+			@RequestBody @Valid RequestWrapper<SignRawMessageRequestDto> requestDto) {
+		byte[] signature = signRawMessage(
+				requestDto.getRequest().getMessage(),
+				requestDto.getRequest().getApplicationId(),
+				requestDto.getRequest().getReferenceId()
+		);
+		String signatureBase64 = java.util.Base64.getEncoder().encodeToString(signature);
+		SignRawMessageResponseDto responseDto = new SignRawMessageResponseDto();
+		responseDto.setSignature(signatureBase64);
+		responseDto.setTimestamp(io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString());
+		ResponseWrapper<SignRawMessageResponseDto> response = new ResponseWrapper<>();
+		response.setResponse(responseDto);
+		return response;
+	}
+
+	@ResponseBody
+	@PostMapping("/verifyRawMessage")
+	@ApiOperation(value = "Verify a raw message signature using ECDSA", notes = "Verifies a message signature using the HSM-backed key for the given application and reference ID.")
+	public ResponseWrapper<VerifyRawMessageResponseDto> verifyRawMessage(
+			@RequestBody @Valid RequestWrapper<VerifyRawMessageRequestDto> requestDto) {
+		boolean valid = verifyRawMessage(
+				requestDto.getRequest().getMessage(),
+				java.util.Base64.getDecoder().decode(requestDto.getRequest().getSignature()),
+				requestDto.getRequest().getApplicationId(),
+				requestDto.getRequest().getReferenceId()
+		);
+		VerifyRawMessageResponseDto responseDto = new VerifyRawMessageResponseDto();
+		responseDto.setValid(valid);
+		responseDto.setMessage(valid ? "Signature valid" : "Signature invalid");
+		responseDto.setTimestamp(io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString());
+		ResponseWrapper<VerifyRawMessageResponseDto> response = new ResponseWrapper<>();
+		response.setResponse(responseDto);
+		return response;
+	}
+
+	@Override
+	public byte[] signBinary(byte[] data, String applicationId, String referenceId) {
+		// Use your existing implementation or logic
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			return io.mosip.kernel.signature.util.SignatureUtil.signMessage(data, privateKey, providerName);
+		} catch (Exception e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "BINARY_SIGN", SignatureConstant.BLANK, "Error signing binary data", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(
+				io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+				io.mosip.kernel.signature.constant.SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	@Override
+	public boolean verifyBinary(byte[] data, byte[] signatureBytes, String applicationId, String referenceId) {
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			return io.mosip.kernel.signature.util.SignatureUtil.verifyMessage(data, signatureBytes, publicKey, providerName);
+		} catch (Exception e) {
+			LOGGER.error(SignatureConstant.SESSIONID, "BINARY_VERIFY", SignatureConstant.BLANK, "Error verifying binary data", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(
+				io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorCode(),
+				io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	@Override
+	public SignatureResponseDto signCredential(SignCredentialRequestDto requestDto) {
+		String message = requestDto.getMessage();
+		String applicationId = requestDto.getApplicationId();
+		String referenceId = requestDto.getReferenceId();
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
+		byte[]  keyId = certificateResponse.getUniqueIdentifier().getBytes();
+		try {
+			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName); // <-- use provider
+			String signatureBase64 = Base64.encodeBase64String(signature);
+			SignatureResponseDto response = new SignatureResponseDto();
+			response.setSignatureData(signatureBase64);
+			
+			response.setKid(Base64.encodeBase64String(keyId));
+
+			return response;
+		} catch (Exception e) {
+			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);
+			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(), SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+
+	/**
+	 * Signs a message using SHA256withECDSA and the provided private key.
+	 * @param message the message to sign
+	 * @param privateKey the private key
+	 * @return the DER-encoded signature
+	 */
+	public static byte[] signMessage(String message, java.security.PrivateKey privateKey)
+			throws java.security.NoSuchAlgorithmException, java.security.InvalidKeyException, java.security.SignatureException {
+		java.security.Signature signature = java.security.Signature.getInstance("SHA256withECDSA");
+		signature.initSign(privateKey);
+		signature.update(message.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+		return signature.sign();
+	}
+
+	@Override
+	public boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto) {
+		String message = requestDto.getMessage();
+		String signatureBase64 = requestDto.getSignature();
+		String applicationId = requestDto.getApplicationId();
+		String referenceId = requestDto.getReferenceId();
+		String timestamp = io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString();
+		io.mosip.kernel.keymanagerservice.dto.SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, java.util.Optional.of(referenceId), timestamp);
+		java.security.PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
+		String providerName = certificateResponse.getProviderName();
+		try {
+			byte[] signatureBytes = org.apache.commons.codec.binary.Base64.decodeBase64(signatureBase64);
+			return io.mosip.kernel.signature.util.SignatureUtil.verifyMessage(message, signatureBytes, publicKey, providerName);
+		} catch (Exception e) {
+			LOGGER.error("verifyCredential", "VERIFY_CREDENTIAL", "", "Error verifying credential signature", e);
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorCode(), io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
+		}
 	}
 
 }

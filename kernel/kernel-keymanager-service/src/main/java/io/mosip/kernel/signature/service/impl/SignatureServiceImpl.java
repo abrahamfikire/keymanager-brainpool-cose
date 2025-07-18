@@ -1746,13 +1746,15 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
-		String keyId = certificateResponse.getUniqueIdentifier();
+		byte[]  keyId = certificateResponse.getUniqueIdentifier().getBytes();
 		try {
 			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName); // <-- use provider
 			String signatureBase64 = Base64.encodeBase64String(signature);
 			SignatureResponseDto response = new SignatureResponseDto();
 			response.setSignatureData(signatureBase64);
-			response.setKid(keyId);
+			
+			response.setKid(Base64.encodeBase64String(keyId));
+
 			return response;
 		} catch (Exception e) {
 			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);

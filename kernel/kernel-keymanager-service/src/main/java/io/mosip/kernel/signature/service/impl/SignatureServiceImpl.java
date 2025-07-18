@@ -263,7 +263,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			encryptedSignedData = cryptoCore.sign(signatureRequestDto.getData().getBytes(),
 					certificateResponse.getCertificateEntry().getPrivateKey());
 		}
-		return new SignatureResponseDto(encryptedSignedData);
+		SignatureResponseDto responseDto = new SignatureResponseDto();
+		responseDto.setData(encryptedSignedData);
+		return responseDto;
 	}
 
 	@Override
@@ -1744,10 +1746,14 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
+		String keyId = certificateResponse.getUniqueIdentifier();
 		try {
 			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName); // <-- use provider
 			String signatureBase64 = Base64.encodeBase64String(signature);
-			return new SignatureResponseDto(signatureBase64);
+			SignatureResponseDto response = new SignatureResponseDto();
+			response.setSignatureData(signatureBase64);
+			response.setKid(keyId);
+			return response;
 		} catch (Exception e) {
 			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);
 			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(), SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);

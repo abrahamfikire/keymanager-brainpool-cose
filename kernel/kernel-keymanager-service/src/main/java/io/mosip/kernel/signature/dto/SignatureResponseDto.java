@@ -29,5 +29,14 @@ public class SignatureResponseDto {
 	 */
 	@ApiModelProperty(notes = "Data encrypted/decrypted in BASE64 encoding")
 	private String data;
+	
+	@ApiModelProperty(notes = "	KEY ID")
+	private String kid;
+	/**
+	 * SIGNATUE Data 
+	 */
+
+	@ApiModelProperty(notes = "signature Data used for only signcredential")
+	private String signatureData;
 
 }

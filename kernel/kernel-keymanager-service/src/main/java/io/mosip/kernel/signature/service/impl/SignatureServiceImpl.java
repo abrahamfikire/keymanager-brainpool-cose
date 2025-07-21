@@ -1746,14 +1746,16 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
-		byte[]  keyId = certificateResponse.getUniqueIdentifier().getBytes();
+		
+		//byte[]  keyId = certificateResponse.getUniqueIdentifier().getBytes();
+		String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
 		try {
 			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName); // <-- use provider
 			String signatureBase64 = Base64.encodeBase64String(signature);
 			SignatureResponseDto response = new SignatureResponseDto();
 			response.setSignatureData(signatureBase64);
 			
-			response.setKid(Base64.encodeBase64String(keyId));
+			response.setKid(keyId);
 
 			return response;
 		} catch (Exception e) {

@@ -1746,8 +1746,13 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
 		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
-		
-		//byte[]  keyId = certificateResponse.getUniqueIdentifier().getBytes();
+
+		// Log certificate details for debugging key rotation and type
+		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
+		LOGGER.info("signCredential", "CERT_DEBUG", "", "Certificate Subject: {}", cert.getSubjectX500Principal());
+		LOGGER.info("signCredential", "CERT_DEBUG", "", "Certificate Serial Number: {}", cert.getSerialNumber());
+		LOGGER.info("signCredential", "CERT_DEBUG", "", "Certificate Public Key Algorithm: {}", cert.getPublicKey().getAlgorithm());
+
 		String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
 		try {
 			byte[] derSignature = SignatureUtil.signMessage(message, privateKey, providerName);
@@ -1756,9 +1761,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			String signatureBase64 = Base64.encodeBase64String(rawSignature);
 			SignatureResponseDto response = new SignatureResponseDto();
 			response.setSignatureData(signatureBase64);
-			
 			response.setKid(keyId);
-
 			return response;
 		} catch (Exception e) {
 			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);

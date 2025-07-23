@@ -10,5 +10,6 @@ public class CBORSignatureRequestDto {
     public String getApplicationId() { return applicationId; }
     public void setApplicationId(String applicationId) { this.applicationId = applicationId; }
     public String getReferenceId() { return referenceId; }
+
     public void setReferenceId(String referenceId) { this.referenceId = referenceId; }
 } 

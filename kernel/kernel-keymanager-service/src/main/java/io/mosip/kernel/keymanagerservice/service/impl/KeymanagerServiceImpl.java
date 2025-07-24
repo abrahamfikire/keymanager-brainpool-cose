@@ -1302,16 +1302,20 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		if (allCerts != null && allCerts.getAllCertificates() != null) {
 			for (var certDto : allCerts.getAllCertificates()) {
 				try {
-					// Parse PEM to X509Certificate
 					String pem = certDto.getCertificateData();
 					X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
-							.generateCertificate(new java.io.ByteArrayInputStream(
-									pem.replace("-----BEGIN CERTIFICATE-----", "")
-									   .replace("-----END CERTIFICATE-----", "")
-									   .replaceAll("\\s", "")
-									   .getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)));
-					// Get EC public key
-					if (!(cert.getPublicKey() instanceof ECPublicKey)) continue;
+						.generateCertificate(new java.io.ByteArrayInputStream(
+							pem.replace("-----BEGIN CERTIFICATE-----", "")
+							   .replace("-----END CERTIFICATE-----", "")
+							   .replaceAll("\\s", "")
+							   .getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)));
+					PublicKey pubKey = cert.getPublicKey();
+					System.out.println("Cert Subject: " + cert.getSubjectDN());
+					System.out.println("Key type: " + pubKey.getAlgorithm() + ", class: " + pubKey.getClass());
+					if (!(pubKey instanceof ECPublicKey)) {
+						System.out.println("Skipping non-EC key");
+						continue;
+					}
 					ECPublicKey ecKey = (ECPublicKey) cert.getPublicKey();
 					// x, y as base64url
 					String x = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
@@ -1328,7 +1332,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, y, Collections.singletonList(x5c));
 					keys.add(jwk);
 				} catch (Exception e) {
-					// skip invalid certs
+					e.printStackTrace();
 				}
 			}
 		}

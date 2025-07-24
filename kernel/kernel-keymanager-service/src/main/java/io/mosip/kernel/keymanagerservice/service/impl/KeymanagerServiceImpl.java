@@ -18,7 +18,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-
+import java.util.Base64;
+import java.util.Collections;
 
 import javax.security.auth.x500.X500Principal;
 
@@ -79,6 +80,10 @@ import io.mosip.kernel.keymanagerservice.service.KeymanagerService;
 import io.mosip.kernel.keymanagerservice.util.KeymanagerUtil;
 import io.mosip.kernel.keymanagerservice.validator.ECKeyPairGenRequestValidator;
 import io.mosip.kernel.signature.util.SignatureUtil;
+import io.mosip.kernel.keymanagerservice.dto.JwksResponseDto;
+import java.security.cert.CertificateFactory;
+import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECParameterSpec;
 
 
 /**
@@ -226,7 +231,13 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		X500Principal latestCertPrincipal = getLatestCertPrincipal(keyAlias);
 		CertificateParameters certParams = keymanagerUtil.getCertificateParameters(latestCertPrincipal,
 				generationDateTime, expiryDateTime);
-		keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
+		//keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
+		String ecCurve = ecRefIdsAlgoNamesMap.get(referenceId);
+		if (ecCurve != null) {
+			keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams, ecCurve.toLowerCase());
+		} else {
+			keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams); // fallback to default (RSA)
+		}
 		X509Certificate x509Cert = (X509Certificate) keyStore.getCertificate(alias);
 		String certThumbprint = cryptomanagerUtil.getCertificateThumbprintInHex(x509Cert);
 		String uniqueValue = applicationId + KeymanagerConstant.UNDER_SCORE + referenceId + KeymanagerConstant.UNDER_SCORE +
@@ -676,6 +687,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			return new CertificateInfo<>(genAlias, x509Cert);
 		} 
 		keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
+	//	String ecCurve = ecRefIdsAlgoNamesMap.get(refId);
+	
 		x509Cert = (X509Certificate) keyStore.getCertificate(alias);
 		storeAsymmetricKey(alias, applicationId, refId, keyAliasMap, x509Cert, generationDateTime, expiryDateTime);
 		return new CertificateInfo<>(genAlias, x509Cert);
@@ -1288,5 +1301,60 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		
 		ecKeyPairGenRequestValidator.validate(objectType, request);
 		return generateKey(objectType, applicationId, refId, forceFlag, request);
+	}
+
+	@Override
+	public JwksResponseDto getJwksForAppRef(String applicationId, String referenceId) {
+		AllCertificatesDataResponseDto allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(referenceId));
+		List<JwksResponseDto.JwkKeyDto> keys = new ArrayList<>();
+		if (allCerts != null && allCerts.getAllCertificates() != null) {
+			for (var certDto : allCerts.getAllCertificates()) {
+				try {
+					String pem = certDto.getCertificateData();
+					String base64 = pem
+						.replace("-----BEGIN CERTIFICATE-----", "")
+						.replace("-----END CERTIFICATE-----", "")
+						.replaceAll("\\s+", "");
+					byte[] der = Base64.getDecoder().decode(base64);
+					X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
+						.generateCertificate(new java.io.ByteArrayInputStream(der));
+					PublicKey pubKey = cert.getPublicKey();
+					System.out.println("Cert Subject: " + cert.getSubjectDN());
+					System.out.println("Key type: " + pubKey.getAlgorithm() + ", class: " + pubKey.getClass());
+					if (!(pubKey instanceof ECPublicKey)) {
+						System.out.println("Skipping non-EC key");
+						continue;
+					}
+					ECPublicKey ecKey = (ECPublicKey) cert.getPublicKey();
+					// x, y as base64url
+					String x = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
+					String y = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineY().toByteArray());
+					// crv
+					String crv = getCrvFromParams(ecKey.getParams());
+					// x5c: DER base64
+					String x5c = Base64.getEncoder().encodeToString(cert.getEncoded());
+					// kid: use keyId or SHA-1 thumbprint
+					String kid = certDto.getKeyId();
+					// alg/kty
+					String alg = "ES256";
+					String kty = "EC";
+					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, Collections.singletonList(x5c),y);
+					keys.add(jwk);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return new JwksResponseDto(keys);
+	}
+
+	private String getCrvFromParams(ECParameterSpec params) {
+		// Only support P-256 for now
+		// You can expand this to support other curves if needed
+		int fieldSize = params.getCurve().getField().getFieldSize();
+		if (fieldSize == 256) return "P-256";
+		if (fieldSize == 384) return "P-384";
+		if (fieldSize == 521) return "P-521";
+		return "unknown";
 	}
 }

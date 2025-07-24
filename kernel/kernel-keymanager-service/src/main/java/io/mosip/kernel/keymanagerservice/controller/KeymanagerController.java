@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.mosip.kernel.keymanagerservice.dto.JwksResponseDto;
 
 import io.mosip.kernel.core.http.RequestWrapper;
 import io.mosip.kernel.core.http.ResponseFilter;
@@ -22,6 +23,7 @@ import io.mosip.kernel.keymanagerservice.dto.AllCertificatesDataResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.CSRGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.KeyPairGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.KeyPairGenerateResponseDto;
+import io.mosip.kernel.keymanagerservice.dto.JwksResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.RevokeKeyRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.RevokeKeyResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.SymmetricKeyGenerateRequestDto;
@@ -280,4 +282,17 @@ public class KeymanagerController {
 		response.setResponse(keymanagerService.revokeKey(revokeKeyRequestDto.getRequest()));
 		return response;
 	}
+
+    /**
+     * JWKS endpoint: Returns JSON Web Key Set for all certificates for the given app/ref.
+     * No authentication required.
+     */
+	@GetMapping(value = "/jwks", produces = "application/json")
+    public ResponseWrapper<JwksResponseDto> getJwks(
+            @RequestParam("applicationId") String applicationId,
+            @RequestParam(value = "referenceId", required = false) String referenceId) {
+        ResponseWrapper<JwksResponseDto> response = new ResponseWrapper<>();
+        response.setResponse(keymanagerService.getJwksForAppRef(applicationId, referenceId));
+        return response;
+    }
 }

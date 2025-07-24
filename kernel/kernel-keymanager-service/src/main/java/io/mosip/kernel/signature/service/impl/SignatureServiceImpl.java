@@ -1750,10 +1750,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		//byte[]  keyId = certificateResponse.getUniqueIdentifier().getBytes();
 		String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
 		try {
-			byte[] derSignature = SignatureUtil.signMessage(message, privateKey, providerName);
-			// For P-256, keySizeBytes = 32
-			byte[] rawSignature = derToRaw(derSignature, 32);
-			String signatureBase64 = Base64.encodeBase64String(rawSignature);
+			byte[] signature = SignatureUtil.signMessage(message, privateKey, providerName); // <-- use provider
+			String signatureBase64 = Base64.encodeBase64String(signature);
 			SignatureResponseDto response = new SignatureResponseDto();
 			response.setSignatureData(signatureBase64);
 			

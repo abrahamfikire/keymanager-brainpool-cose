@@ -1303,12 +1303,13 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			for (var certDto : allCerts.getAllCertificates()) {
 				try {
 					String pem = certDto.getCertificateData();
+					String base64 = pem
+						.replace("-----BEGIN CERTIFICATE-----", "")
+						.replace("-----END CERTIFICATE-----", "")
+						.replaceAll("\\s+", "");
+					byte[] der = Base64.getDecoder().decode(base64);
 					X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
-						.generateCertificate(new java.io.ByteArrayInputStream(
-							pem.replace("-----BEGIN CERTIFICATE-----", "")
-							   .replace("-----END CERTIFICATE-----", "")
-							   .replaceAll("\\s", "")
-							   .getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)));
+						.generateCertificate(new java.io.ByteArrayInputStream(der));
 					PublicKey pubKey = cert.getPublicKey();
 					System.out.println("Cert Subject: " + cert.getSubjectDN());
 					System.out.println("Key type: " + pubKey.getAlgorithm() + ", class: " + pubKey.getClass());

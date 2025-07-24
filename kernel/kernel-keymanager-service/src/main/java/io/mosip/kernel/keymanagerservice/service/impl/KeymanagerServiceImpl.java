@@ -231,7 +231,13 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		X500Principal latestCertPrincipal = getLatestCertPrincipal(keyAlias);
 		CertificateParameters certParams = keymanagerUtil.getCertificateParameters(latestCertPrincipal,
 				generationDateTime, expiryDateTime);
-		keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
+		//keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
+		String ecCurve = ecRefIdsAlgoNamesMap.get(referenceId);
+		if (ecCurve != null) {
+			keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams, ecCurve.toLowerCase());
+		} else {
+			keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams); // fallback to default (RSA)
+		}
 		X509Certificate x509Cert = (X509Certificate) keyStore.getCertificate(alias);
 		String certThumbprint = cryptomanagerUtil.getCertificateThumbprintInHex(x509Cert);
 		String uniqueValue = applicationId + KeymanagerConstant.UNDER_SCORE + referenceId + KeymanagerConstant.UNDER_SCORE +
@@ -681,6 +687,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			return new CertificateInfo<>(genAlias, x509Cert);
 		} 
 		keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
+	//	String ecCurve = ecRefIdsAlgoNamesMap.get(refId);
+	
 		x509Cert = (X509Certificate) keyStore.getCertificate(alias);
 		storeAsymmetricKey(alias, applicationId, refId, keyAliasMap, x509Cert, generationDateTime, expiryDateTime);
 		return new CertificateInfo<>(genAlias, x509Cert);

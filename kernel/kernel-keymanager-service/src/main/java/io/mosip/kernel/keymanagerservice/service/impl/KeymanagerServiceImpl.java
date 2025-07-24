@@ -10,7 +10,6 @@ import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -227,17 +226,11 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		X500Principal latestCertPrincipal = getLatestCertPrincipal(keyAlias);
 		CertificateParameters certParams = keymanagerUtil.getCertificateParameters(latestCertPrincipal,
 				generationDateTime, expiryDateTime);
-		String ecCurve = ecRefIdsAlgoNamesMap.get(referenceId);
-		if (ecCurve != null) {
-			keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams, ecCurve.toLowerCase());
-		} else {
-			keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams); // fallback to default (RSA)
-		}
+		keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams);
 		X509Certificate x509Cert = (X509Certificate) keyStore.getCertificate(alias);
 		String certThumbprint = cryptomanagerUtil.getCertificateThumbprintInHex(x509Cert);
 		String uniqueValue = applicationId + KeymanagerConstant.UNDER_SCORE + referenceId + KeymanagerConstant.UNDER_SCORE +
-								timeStamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS")) +
-								KeymanagerConstant.UNDER_SCORE + alias; // alias is already a UUID
+								timeStamp.format(KeymanagerConstant.DATE_FORMATTER);
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 								"Unique Value formatter: " + uniqueValue);
 		String uniqueIdentifier = keymanagerUtil.getUniqueIdentifier(uniqueValue);
@@ -395,8 +388,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			dbHelper.storeKeyInDBStore(alias, masterAlias, certificateData, encryptedPrivateKey);
 			String certThumbprint = cryptomanagerUtil.getCertificateThumbprintInHex(x509Cert);
 			String uniqueValue = applicationId + KeymanagerConstant.UNDER_SCORE + referenceId + KeymanagerConstant.UNDER_SCORE +
-								timeStamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss-SSS")) +
-								KeymanagerConstant.UNDER_SCORE + alias; // alias is already a UUID
+								timeStamp.format(KeymanagerConstant.DATE_FORMATTER);
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 									"Unique Value formatter: " + uniqueValue);
 			String uniqueIdentifier = keymanagerUtil.getUniqueIdentifier(uniqueValue);

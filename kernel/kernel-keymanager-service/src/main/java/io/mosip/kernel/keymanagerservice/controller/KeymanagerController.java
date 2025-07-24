@@ -23,6 +23,7 @@ import io.mosip.kernel.keymanagerservice.dto.AllCertificatesDataResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.CSRGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.KeyPairGenerateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.KeyPairGenerateResponseDto;
+import io.mosip.kernel.keymanagerservice.dto.JwksResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.RevokeKeyRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.RevokeKeyResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.SymmetricKeyGenerateRequestDto;
@@ -281,4 +282,15 @@ public class KeymanagerController {
 		response.setResponse(keymanagerService.revokeKey(revokeKeyRequestDto.getRequest()));
 		return response;
 	}
+
+    /**
+     * JWKS endpoint: Returns JSON Web Key Set for all certificates for the given app/ref.
+     * No authentication required.
+     */
+    @GetMapping(value = "/jwks", produces = "application/json")
+    public JwksResponseDto getJwks(
+            @RequestParam("applicationId") String applicationId,
+            @RequestParam(value = "referenceId", required = false) String referenceId) {
+        return keymanagerService.getJwksForAppRef(applicationId, referenceId);
+    }
 }

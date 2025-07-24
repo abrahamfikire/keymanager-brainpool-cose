@@ -16,6 +16,7 @@ import io.mosip.kernel.keymanagerservice.dto.SymmetricKeyRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.SymmetricKeyResponseDto;
 import io.mosip.kernel.keymanagerservice.dto.UploadCertificateRequestDto;
 import io.mosip.kernel.keymanagerservice.dto.UploadCertificateResponseDto;
+import io.mosip.kernel.keymanagerservice.dto.JwksResponseDto;
 
 /**
  * This interface provides the methods which can be used for Key management
@@ -132,6 +133,11 @@ public interface KeymanagerService {
 	 * @return {@link KeyPairGenerateResponseDto} instance
 	 */
 	public KeyPairGenerateResponseDto generateECSignKey(String objectType, KeyPairGenerateRequestDto request);
+
+	/**
+	 * Returns JWKS for all certificates for the given applicationId and referenceId.
+	 */
+	JwksResponseDto getJwksForAppRef(String applicationId, String referenceId);
 
 }
 

@@ -15,6 +15,7 @@ public class JwkKeyDto {
     private String alg;
     private String crv;
     private String x;
-    private String y;
     private List<String> x5c;
+    private String y;
+
 } 

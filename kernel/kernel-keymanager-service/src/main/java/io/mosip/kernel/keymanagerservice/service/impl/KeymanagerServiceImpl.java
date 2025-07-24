@@ -1338,7 +1338,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					// alg/kty
 					String alg = "ES256";
 					String kty = "EC";
-					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, y, Collections.singletonList(x5c));
+					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, Collections.singletonList(x5c),y);
 					keys.add(jwk);
 				} catch (Exception e) {
 					e.printStackTrace();

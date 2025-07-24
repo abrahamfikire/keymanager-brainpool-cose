@@ -18,7 +18,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-
+import java.util.Base64;
+import java.util.Collections;
 
 import javax.security.auth.x500.X500Principal;
 
@@ -79,6 +80,10 @@ import io.mosip.kernel.keymanagerservice.service.KeymanagerService;
 import io.mosip.kernel.keymanagerservice.util.KeymanagerUtil;
 import io.mosip.kernel.keymanagerservice.validator.ECKeyPairGenRequestValidator;
 import io.mosip.kernel.signature.util.SignatureUtil;
+import io.mosip.kernel.keymanagerservice.dto.JwksResponseDto;
+import java.security.cert.CertificateFactory;
+import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECParameterSpec;
 
 
 /**
@@ -1288,5 +1293,55 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		
 		ecKeyPairGenRequestValidator.validate(objectType, request);
 		return generateKey(objectType, applicationId, refId, forceFlag, request);
+	}
+
+	@Override
+	public JwksResponseDto getJwksForAppRef(String applicationId, String referenceId) {
+		AllCertificatesDataResponseDto allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(referenceId));
+		List<JwksResponseDto.JwkKeyDto> keys = new ArrayList<>();
+		if (allCerts != null && allCerts.getAllCertificates() != null) {
+			for (var certDto : allCerts.getAllCertificates()) {
+				try {
+					// Parse PEM to X509Certificate
+					String pem = certDto.getCertificateData();
+					X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
+							.generateCertificate(new java.io.ByteArrayInputStream(
+									pem.replace("-----BEGIN CERTIFICATE-----", "")
+									   .replace("-----END CERTIFICATE-----", "")
+									   .replaceAll("\\s", "")
+									   .getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)));
+					// Get EC public key
+					if (!(cert.getPublicKey() instanceof ECPublicKey)) continue;
+					ECPublicKey ecKey = (ECPublicKey) cert.getPublicKey();
+					// x, y as base64url
+					String x = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
+					String y = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineY().toByteArray());
+					// crv
+					String crv = getCrvFromParams(ecKey.getParams());
+					// x5c: DER base64
+					String x5c = Base64.getEncoder().encodeToString(cert.getEncoded());
+					// kid: use keyId or SHA-1 thumbprint
+					String kid = certDto.getKeyId();
+					// alg/kty
+					String alg = "ES256";
+					String kty = "EC";
+					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, y, Collections.singletonList(x5c));
+					keys.add(jwk);
+				} catch (Exception e) {
+					// skip invalid certs
+				}
+			}
+		}
+		return new JwksResponseDto(keys);
+	}
+
+	private String getCrvFromParams(ECParameterSpec params) {
+		// Only support P-256 for now
+		// You can expand this to support other curves if needed
+		int fieldSize = params.getCurve().getField().getFieldSize();
+		if (fieldSize == 256) return "P-256";
+		if (fieldSize == 384) return "P-384";
+		if (fieldSize == 521) return "P-521";
+		return "unknown";
 	}
 }

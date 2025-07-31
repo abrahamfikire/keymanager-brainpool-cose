@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Arrays;
 
 import javax.crypto.SecretKey;
 
@@ -1739,7 +1740,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 	@Override
 	public SignatureResponseDto signCredential(SignCredentialRequestDto requestDto) {
-		String message = requestDto.getMessage();
+		String base64Message = requestDto.getMessage();
 		String applicationId = requestDto.getApplicationId();
 		String referenceId = requestDto.getReferenceId();
 		String timestamp = DateUtils.getUTCCurrentDateTimeString();
@@ -1755,7 +1756,17 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 		String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
 		try {
-			byte[] derSignature = SignatureUtil.signMessage(message, privateKey, providerName);
+			// Decode base64 to binary bytes
+			byte[] messageBytes = Base64.decodeBase64(base64Message);
+			
+			// Sign the binary data directly
+			Signature signature = (providerName != null && !providerName.isEmpty())
+					? Signature.getInstance("SHA256withECDSA", providerName)
+					: Signature.getInstance("SHA256withECDSA");
+			signature.initSign(privateKey);
+			signature.update(messageBytes);
+			byte[] derSignature = signature.sign();
+			
 			// For P-256, keySizeBytes = 32
 			byte[] rawSignature = derToRaw(derSignature, 32);
 			String signatureBase64 = Base64.encodeBase64String(rawSignature);
@@ -1785,7 +1796,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 	@Override
 	public boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto) {
-		String message = requestDto.getMessage();
+		String base64Message = requestDto.getMessage();
 		String signatureBase64 = requestDto.getSignature();
 		String applicationId = requestDto.getApplicationId();
 		String referenceId = requestDto.getReferenceId();
@@ -1794,12 +1805,35 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		java.security.PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
 		String providerName = certificateResponse.getProviderName();
 		try {
+			// Decode base64 to binary bytes
+			byte[] messageBytes = Base64.decodeBase64(base64Message);
 			byte[] signatureBytes = org.apache.commons.codec.binary.Base64.decodeBase64(signatureBase64);
-			return io.mosip.kernel.signature.util.SignatureUtil.verifyMessage(message, signatureBytes, publicKey, providerName);
+			signatureBytes = rawToDer(signatureBytes); // <-- Add this line
+			
+			// Verify the binary data directly
+			Signature signature = (providerName != null && !providerName.isEmpty())
+					? Signature.getInstance("SHA256withECDSA", providerName)
+					: Signature.getInstance("SHA256withECDSA");
+			signature.initVerify(publicKey);
+			signature.update(messageBytes);
+			return signature.verify(signatureBytes);
 		} catch (Exception e) {
 			LOGGER.error("verifyCredential", "VERIFY_CREDENTIAL", "", "Error verifying credential signature", e);
 			throw new io.mosip.kernel.signature.exception.SignatureFailureException(io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorCode(), io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorMessage(), e);
 		}
 	}
 
+	public static byte[] rawToDer(byte[] rawSignature) {
+		int len = rawSignature.length / 2;
+		BigInteger r = new BigInteger(1, Arrays.copyOfRange(rawSignature, 0, len));
+		BigInteger s = new BigInteger(1, Arrays.copyOfRange(rawSignature, len, rawSignature.length));
+		ASN1EncodableVector v = new ASN1EncodableVector();
+		v.add(new ASN1Integer(r));
+		v.add(new ASN1Integer(s));
+		try {
+			return new DERSequence(v).getEncoded();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 }

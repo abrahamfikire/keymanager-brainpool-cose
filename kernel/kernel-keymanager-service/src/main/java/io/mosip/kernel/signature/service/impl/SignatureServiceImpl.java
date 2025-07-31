@@ -1808,6 +1808,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			// Decode base64 to binary bytes
 			byte[] messageBytes = Base64.decodeBase64(base64Message);
 			byte[] signatureBytes = org.apache.commons.codec.binary.Base64.decodeBase64(signatureBase64);
+			signatureBytes = rawToDer(signatureBytes); // <-- Add this line
 			
 			// Verify the binary data directly
 			Signature signature = (providerName != null && !providerName.isEmpty())

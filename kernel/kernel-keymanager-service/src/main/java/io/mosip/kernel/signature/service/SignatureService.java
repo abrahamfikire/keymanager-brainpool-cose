@@ -21,6 +21,8 @@ import io.mosip.kernel.signature.dto.CBORSignatureVerifyRequestDto;
 import io.mosip.kernel.signature.dto.CBORSignatureVerifyResponseDto;
 import io.mosip.kernel.signature.dto.SignCredentialRequestDto;
 import io.mosip.kernel.signature.dto.VerifyCredentialRequestDto;
+import io.mosip.kernel.signature.dto.QRCodeRequestDto;
+import io.mosip.kernel.signature.dto.QRCodeResponseDto;
 
 public interface SignatureService {
 	/**
@@ -133,4 +135,11 @@ public interface SignatureService {
      * @return true if valid, false otherwise
      */
     boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto);
+
+    /**
+     * Generates a QR code for the given data.
+     * @param qrCodeRequestDto the request containing data to encode
+     * @return the QR code response dto
+     */
+    QRCodeResponseDto generateQRCode(QRCodeRequestDto qrCodeRequestDto);
 }

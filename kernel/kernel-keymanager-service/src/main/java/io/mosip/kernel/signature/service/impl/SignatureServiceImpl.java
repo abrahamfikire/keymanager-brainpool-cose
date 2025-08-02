@@ -1836,4 +1836,106 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			throw new RuntimeException(e);
 		}
 	}
+
+	@Override
+	public QRCodeResponseDto generateQRCode(QRCodeRequestDto requestDto) {
+		String applicationId = requestDto.getApplicationId();
+		String referenceId = requestDto.getReferenceId();
+		String dataToSign = requestDto.getDataToSign();
+		String qrCodeType = requestDto.getQrCodeType();
+		String additionalInfo = requestDto.getAdditionalInfo();
+		String expiryTime = requestDto.getExpiryTime();
+		String issuerId = requestDto.getIssuerId();
+		
+		String timestamp = DateUtils.getUTCCurrentDateTimeString();
+		
+		try {
+			// Get certificate and sign the data
+			SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
+			PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+			String providerName = certificateResponse.getProviderName();
+			String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
+			
+			// Create QR code payload structure
+			Map<String, Object> qrPayload = new HashMap<>();
+			qrPayload.put("type", qrCodeType);
+			qrPayload.put("data", dataToSign);
+			qrPayload.put("issuerId", issuerId != null ? issuerId : "www.mosip.io");
+			qrPayload.put("timestamp", timestamp);
+			qrPayload.put("keyId", keyId);
+			qrPayload.put("algorithm", "ES256");
+			
+			if (additionalInfo != null) {
+				qrPayload.put("additionalInfo", additionalInfo);
+			}
+			
+			if (expiryTime != null) {
+				qrPayload.put("expiryTime", expiryTime);
+			}
+			
+			// Convert payload to JSON
+			String payloadJson = JsonUtils.javaObjectToJsonString(qrPayload);
+			byte[] payloadBytes = payloadJson.getBytes(StandardCharsets.UTF_8);
+			
+			// Sign the payload
+			Signature signature = (providerName != null && !providerName.isEmpty())
+					? Signature.getInstance("SHA256withECDSA", providerName)
+					: Signature.getInstance("SHA256withECDSA");
+			signature.initSign(privateKey);
+			signature.update(payloadBytes);
+			byte[] derSignature = signature.sign();
+			
+			// Convert to raw format for compactness
+			byte[] rawSignature = derToRaw(derSignature, 32);
+			String signatureBase64 = Base64.encodeBase64String(rawSignature);
+			
+			// Create final QR code data structure
+			Map<String, Object> qrCodeData = new HashMap<>();
+			qrCodeData.put("payload", qrPayload);
+			qrCodeData.put("signature", signatureBase64);
+			qrCodeData.put("jwksUrl", "/keymanager/jwks?applicationId=" + applicationId + "&referenceId=" + referenceId);
+			
+			String qrCodeText = JsonUtils.javaObjectToJsonString(qrCodeData);
+			
+			// Generate QR code image (you may need to add QR code library dependency)
+			// For now, we'll return the text data
+			String qrCodeImageBase64 = generateQRCodeImage(qrCodeText);
+			
+			QRCodeResponseDto response = new QRCodeResponseDto();
+			response.setQrCodeData(qrCodeImageBase64);
+			response.setQrCodeText(qrCodeText);
+			response.setSignature(signatureBase64);
+			response.setKeyId(keyId);
+			response.setAlgorithm("ES256");
+			response.setIssuerId(issuerId != null ? issuerId : "www.mosip.io");
+			response.setExpiryTime(expiryTime);
+			response.setJwksUrl("/keymanager/jwks?applicationId=" + applicationId + "&referenceId=" + referenceId);
+			response.setTimestamp(timestamp);
+			
+			return response;
+			
+		} catch (Exception e) {
+			LOGGER.error("generateQRCode", "QR_CODE_GENERATION", "", "Error generating QR code", e);
+			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(), 
+					SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+		}
+	}
+	
+	/**
+	 * Generates QR code image from text data
+	 * @param text the text to encode in QR code
+	 * @return base64 encoded QR code image
+	 */
+	private String generateQRCodeImage(String text) {
+		try {
+			// This is a placeholder implementation
+			// You should add a QR code library like ZXing or QRGen
+			// For now, we'll return a placeholder
+			LOGGER.info("generateQRCodeImage", "QR_CODE_IMAGE", "", "QR code image generation not implemented yet");
+			return "QR_CODE_IMAGE_PLACEHOLDER";
+		} catch (Exception e) {
+			LOGGER.error("generateQRCodeImage", "QR_CODE_IMAGE", "", "Error generating QR code image", e);
+			return null;
+		}
+	}
 }

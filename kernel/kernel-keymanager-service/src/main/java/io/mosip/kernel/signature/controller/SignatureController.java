@@ -39,6 +39,8 @@ import io.mosip.kernel.signature.dto.SignBinaryRequestDto;
 import io.mosip.kernel.signature.dto.SignBinaryResponseDto;
 import io.mosip.kernel.signature.dto.VerifyBinaryRequestDto;
 import io.mosip.kernel.signature.dto.VerifyBinaryResponseDto;
+import io.mosip.kernel.signature.dto.QRCodeRequestDto;
+import io.mosip.kernel.signature.dto.QRCodeResponseDto;
 import io.mosip.kernel.signature.service.SignatureService;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -363,6 +365,18 @@ public ResponseWrapper<VerifyBinaryResponseDto> verifyBinary(
         boolean valid = service.verifyCredential(requestDto.getRequest());
         io.mosip.kernel.core.http.ResponseWrapper<Boolean> response = new io.mosip.kernel.core.http.ResponseWrapper<>();
         response.setResponse(valid);
+        return response;
+    }
+
+    @ResponseBody
+    @PostMapping("/generateQRCode")
+    @ApiOperation(value = "Generate QR code for offline verification", 
+                  notes = "Creates a QR code containing signed data and verification information for offline mobile app verification")
+    public ResponseWrapper<QRCodeResponseDto> generateQRCode(
+            @RequestBody @Valid RequestWrapper<QRCodeRequestDto> requestDto) {
+        QRCodeResponseDto responseDto = service.generateQRCode(requestDto.getRequest());
+        ResponseWrapper<QRCodeResponseDto> response = new ResponseWrapper<>();
+        response.setResponse(responseDto);
         return response;
     }
 }

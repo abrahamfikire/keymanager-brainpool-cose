@@ -294,5 +294,5 @@ public class KeymanagerController {
          ResponseWrapper<JwksResponseDto> response = new ResponseWrapper<>();
           response.setResponse(keymanagerService.getJwksForAppRef(applicationId, referenceId));
           return response;
-      }
+     }
 }

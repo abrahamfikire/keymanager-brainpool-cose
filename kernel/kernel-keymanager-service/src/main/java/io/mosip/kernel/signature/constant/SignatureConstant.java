@@ -76,4 +76,10 @@ public class SignatureConstant {
 
 	public static final String JWS_EDDSA_SIGN_ALGO_CONST = "EdDSA";
 	public static final String JWS_BRAINPOOL_SIGN_ALGO_CONST = "EC_BRAINPOOLP256R1_SIGN";
+
+	// ===== SECURITY CONSTANTS =====
+	public static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB limit
+	public static final int MIN_DER_SIZE = 8; // Minimum DER signature size
+	public static final int MAX_DER_SIZE = 72; // Maximum DER signature size for P-256
+	public static final int P256_RAW_SIGNATURE_SIZE = 64; // 32 * 2 for P-256
 }

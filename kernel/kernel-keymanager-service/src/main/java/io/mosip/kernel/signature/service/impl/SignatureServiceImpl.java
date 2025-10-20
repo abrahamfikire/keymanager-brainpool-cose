@@ -1595,8 +1595,17 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		return SignatureConstant.TRUST_NOT_VALID;
 	}
 
-	// Add this utility method (use BouncyCastle)
+	// Add this utility method (use BouncyCastle) - ENHANCED WITH SECURITY VALIDATION
 	public static byte[] derToRaw(byte[] der, int keySizeBytes) throws IOException {
+		// Additional validation for security
+		if (der == null || der.length == 0) {
+			throw new IllegalArgumentException("DER signature cannot be null or empty");
+		}
+		
+		if (keySizeBytes <= 0 || keySizeBytes > 64) {
+			throw new IllegalArgumentException("Invalid key size: " + keySizeBytes);
+		}
+		
 		ASN1Sequence seq = (ASN1Sequence) ASN1Primitive.fromByteArray(der);
 		BigInteger r = ((ASN1Integer) seq.getObjectAt(0)).getValue();
 		BigInteger s = ((ASN1Integer) seq.getObjectAt(1)).getValue();
@@ -1740,43 +1749,62 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 	@Override
 	public SignatureResponseDto signCredential(SignCredentialRequestDto requestDto) {
-		String base64Message = requestDto.getMessage();
-		String applicationId = requestDto.getApplicationId();
-		String referenceId = requestDto.getReferenceId();
-		String timestamp = DateUtils.getUTCCurrentDateTimeString();
-		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, Optional.of(referenceId), timestamp);
-		PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
-		String providerName = certificateResponse.getProviderName(); // <-- fetch provider
-
-		// Log certificate details for debugging key rotation and type
-		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
-		LOGGER.info("signCredential", "CERT_DEBUG", "", "Certificate Subject: {}", cert.getSubjectX500Principal());
-		LOGGER.info("signCredential", "CERT_DEBUG", "", "Certificate Serial Number: {}", cert.getSerialNumber());
-		LOGGER.info("signCredential", "CERT_DEBUG", "", "Certificate Public Key Algorithm: {}", cert.getPublicKey().getAlgorithm());
-
-		String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
+		String sessionId = SignatureConstant.SESSIONID;
+		
 		try {
-			// Decode base64 to binary bytes
+			// ===== SECURITY FIX 1: COMPREHENSIVE INPUT VALIDATION =====
+			validateInputParameters(requestDto);
+			
+			String base64Message = requestDto.getMessage();
+			String applicationId = requestDto.getApplicationId();
+			String referenceId = requestDto.getReferenceId();
+			String timestamp = DateUtils.getUTCCurrentDateTimeString();
+
+			// ===== SECURITY FIX 2: ACCESS CONTROL =====
+			validateAccessControl(applicationId);
+
+			// ===== SECURITY FIX 3: CERTIFICATE VALIDATION =====
+			SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(
+				applicationId, Optional.of(referenceId), timestamp);
+			
+			// CRITICAL: Add missing certificate validation
+			keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), 
+				DateUtils.parseUTCToDate(timestamp));
+			
+			PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
+			String providerName = certificateResponse.getProviderName();
+
+			// ===== SECURITY FIX 4: SECURE LOGGING =====
+			logCertificateInfoSecurely(certificateResponse, applicationId, sessionId);
+
+			String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
+			
+			// ===== SECURITY FIX 5: SAFE SIGNATURE GENERATION =====
 			byte[] messageBytes = Base64.decodeBase64(base64Message);
+			byte[] signature = generateSecureSignature(messageBytes, privateKey, providerName);
 			
-			// Sign the binary data directly
-			Signature signature = (providerName != null && !providerName.isEmpty())
-					? Signature.getInstance("SHA256withECDSA", providerName)
-					: Signature.getInstance("SHA256withECDSA");
-			signature.initSign(privateKey);
-			signature.update(messageBytes);
-			byte[] derSignature = signature.sign();
-			
-			// For P-256, keySizeBytes = 32
-			byte[] rawSignature = derToRaw(derSignature, 32);
+			// ===== SECURITY FIX 6: SAFE SIGNATURE CONVERSION =====
+			byte[] rawSignature = convertDerToRawSafely(signature);
 			String signatureBase64 = Base64.encodeBase64String(rawSignature);
+			
 			SignatureResponseDto response = new SignatureResponseDto();
 			response.setSignatureData(signatureBase64);
 			response.setKid(keyId);
+			
+			LOGGER.info(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+				"Credential signing completed successfully for applicationId: {}", applicationId);
+			
 			return response;
+			
+		} catch (RequestException | SignatureFailureException e) {
+			// Re-throw known exceptions
+			throw e;
 		} catch (Exception e) {
-			LOGGER.error("signCredential", "SIGN_CREDENTIAL", "", "Error signing credential message", e);
-			throw new SignatureFailureException(SignatureErrorCode.SIGN_ERROR.getErrorCode(), SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
+			LOGGER.error(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+				"Unexpected error during credential signing", e);
+			throw new SignatureFailureException(
+				SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+				SignatureErrorCode.SIGN_ERROR.getErrorMessage(), e);
 		}
 	}
 
@@ -1937,5 +1965,202 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			LOGGER.error("generateQRCodeImage", "QR_CODE_IMAGE", "", "Error generating QR code image", e);
 			return null;
 		}
+	}
+
+	// ===== SECURITY VALIDATION METHODS =====
+
+	/**
+	 * SECURITY FIX 1: Comprehensive input validation
+	 */
+	private void validateInputParameters(SignCredentialRequestDto requestDto) {
+		if (requestDto == null) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Request DTO cannot be null");
+		}
+
+		// Validate message
+		if (!SignatureUtil.isDataValid(requestDto.getMessage())) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Message cannot be null or empty");
+		}
+
+		// Validate Base64 format
+		String base64Message = requestDto.getMessage();
+		if (!isValidBase64(base64Message)) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Invalid Base64 format in message");
+		}
+
+		// Validate message size (1MB limit)
+		if (base64Message.length() > SignatureConstant.MAX_MESSAGE_SIZE) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Message size exceeds maximum allowed limit of 1MB");
+		}
+
+		// Validate applicationId
+		if (!SignatureUtil.isDataValid(requestDto.getApplicationId())) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"ApplicationId cannot be null or empty");
+		}
+
+		// Validate referenceId
+		if (!SignatureUtil.isDataValid(requestDto.getReferenceId())) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"ReferenceId cannot be null or empty");
+		}
+
+		// Validate applicationId format (alphanumeric and underscore only)
+		if (!isValidApplicationId(requestDto.getApplicationId())) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Invalid ApplicationId format");
+		}
+
+		// Validate referenceId format
+		if (!isValidReferenceId(requestDto.getReferenceId())) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Invalid ReferenceId format");
+		}
+	}
+
+	/**
+	 * SECURITY FIX 2: Access control validation
+	 */
+	private void validateAccessControl(String applicationId) {
+		// Check if user has access to the application key
+		boolean hasAccess = cryptomanagerUtil.hasKeyAccess(applicationId);
+		if (!hasAccess) {
+			throw new RequestException(SignatureErrorCode.SIGN_NOT_ALLOWED.getErrorCode(),
+				SignatureErrorCode.SIGN_NOT_ALLOWED.getErrorMessage());
+		}
+	}
+
+	/**
+	 * SECURITY FIX 4: Secure logging without information disclosure
+	 */
+	private void logCertificateInfoSecurely(SignatureCertificate certificateResponse, 
+										String applicationId, String sessionId) {
+		X509Certificate cert = certificateResponse.getCertificateEntry().getChain()[0];
+		
+		// Log only non-sensitive information at DEBUG level
+		LOGGER.debug(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+			"Certificate validation completed for applicationId: {}, keyId: {}", 
+			applicationId, certificateResponse.getUniqueIdentifier());
+		
+		// Log certificate algorithm for debugging (non-sensitive)
+		LOGGER.debug(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+			"Certificate algorithm: {}", cert.getPublicKey().getAlgorithm());
+		
+		// Log certificate validity period (non-sensitive)
+		LOGGER.debug(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+			"Certificate valid from: {} to: {}", 
+			cert.getNotBefore(), cert.getNotAfter());
+	}
+
+	/**
+	 * SECURITY FIX 5: Safe signature generation
+	 */
+	private byte[] generateSecureSignature(byte[] messageBytes, PrivateKey privateKey, String providerName) {
+		try {
+			Signature signature = (providerName != null && !providerName.isEmpty())
+				? Signature.getInstance("SHA256withECDSA", providerName)
+				: Signature.getInstance("SHA256withECDSA");
+			
+			signature.initSign(privateKey);
+			signature.update(messageBytes);
+			byte[] derSignature = signature.sign();
+			
+			// Validate signature size
+			if (derSignature.length < SignatureConstant.MIN_DER_SIZE || derSignature.length > SignatureConstant.MAX_DER_SIZE) {
+				throw new SignatureFailureException(
+					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+					"Invalid signature format: unexpected size " + derSignature.length);
+			}
+			
+			return derSignature;
+			
+		} catch (Exception e) {
+			throw new SignatureFailureException(
+				SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+				"Failed to generate signature: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * SECURITY FIX 6: Safe DER to RAW conversion with bounds checking
+	 */
+	private byte[] convertDerToRawSafely(byte[] derSignature) {
+		try {
+			byte[] rawSignature = derToRaw(derSignature, 32);
+			
+			// Validate raw signature size
+			if (rawSignature.length != SignatureConstant.P256_RAW_SIGNATURE_SIZE) { // 32 * 2 for P-256
+				throw new SignatureFailureException(
+					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+					"Invalid raw signature length: expected " + SignatureConstant.P256_RAW_SIGNATURE_SIZE + ", got " + rawSignature.length);
+			}
+			
+			return rawSignature;
+			
+		} catch (Exception e) {
+			throw new SignatureFailureException(
+				SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+				"Failed to convert signature format: " + e.getMessage(), e);
+		}
+	}
+
+	// ===== UTILITY METHODS FOR VALIDATION =====
+
+	/**
+	 * Validates Base64 format
+	 */
+	private boolean isValidBase64(String base64String) {
+		if (base64String == null || base64String.isEmpty()) {
+			return false;
+		}
+		
+		// Check if string matches Base64 pattern
+		java.util.regex.Pattern base64Pattern = java.util.regex.Pattern.compile("^[A-Za-z0-9+/]*={0,2}$");
+		if (!base64Pattern.matcher(base64String).matches()) {
+			return false;
+		}
+		
+		// Check if length is multiple of 4
+		if (base64String.length() % 4 != 0) {
+			return false;
+		}
+		
+		// Try to decode to verify it's valid Base64
+		try {
+			Base64.decodeBase64(base64String);
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Validates applicationId format
+	 */
+	private boolean isValidApplicationId(String applicationId) {
+		if (applicationId == null || applicationId.isEmpty()) {
+			return false;
+		}
+		
+		// Allow alphanumeric characters, underscore, and hyphen
+		// Length between 1 and 50 characters
+		return applicationId.matches("^[A-Za-z0-9_-]{1,50}$");
+	}
+
+	/**
+	 * Validates referenceId format
+	 */
+	private boolean isValidReferenceId(String referenceId) {
+		if (referenceId == null || referenceId.isEmpty()) {
+			return false;
+		}
+		
+		// Allow alphanumeric characters, underscore, and hyphen
+		// Length between 1 and 50 characters
+		return referenceId.matches("^[A-Za-z0-9_-]{1,50}$");
 	}
 }

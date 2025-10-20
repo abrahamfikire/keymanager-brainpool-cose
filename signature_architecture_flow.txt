@@ -1,0 +1,238 @@
+MOSIP SIGNATURE SERVICE - ARCHITECTURAL FLOW
+================================================
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT REQUEST FLOW                                   │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+[Client Application]
+        │
+        │ HTTP POST Request
+        │ (JSON with RequestWrapper)
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           REST CONTROLLER LAYER                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                    SignatureController                                      │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │    │
+│  │  │   /cborSign     │  │   /jwtSign      │  │  /coseSign1     │            │    │
+│  │  │   /cborVerify   │  │   /jwtVerify    │  │  /coseVerify1   │            │    │
+│  │  │   /signBinary   │  │   /verifyBinary │  │  /signCredential│            │    │
+│  │  │   /generateQR   │  │   /verifyCred   │  │                 │            │    │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘            │    │
+│  │                                                                             │    │
+│  │  Features:                                                                  │    │
+│  │  • Input Validation (@Valid)                                               │    │
+│  │  • Request/Response Wrapping                                               │    │
+│  │  • Comprehensive Logging                                                   │    │
+│  │  • Error Handling                                                          │    │
+│  │  • Response Filtering                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Unwrap RequestWrapper
+        │ Extract DTO
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                            DTO LAYER                                               │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                        REQUEST DTOs                                         │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │    │
+│  │  │CBORSignature    │  │JWTSignature     │  │COSESign1        │            │    │
+│  │  │RequestDto       │  │RequestDto       │  │RequestDto       │            │    │
+│  │  │                 │  │                 │  │                 │            │    │
+│  │  │• dataToSign     │  │• dataToSign     │  │• dataToSign     │            │    │
+│  │  │• applicationId  │  │• applicationId  │  │• applicationId  │            │    │
+│  │  │• referenceId    │  │• referenceId    │  │• referenceId    │            │    │
+│  │  │                 │  │• includePayload │  │                 │            │    │
+│  │  │                 │  │• includeCert    │  │                 │            │    │
+│  │  │                 │  │• certificateUrl │  │                 │            │    │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘            │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Pass DTO to Service
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           SERVICE LAYER                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                    SignatureServiceImpl                                     │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    │    │
+│  │  │                      Core Methods                                  │    │    │
+│  │  │                                                                     │    │    │
+│  │  │  • cborSign(CBORSignatureRequestDto)                               │    │    │
+│  │  │  • cborVerify(CBORSignatureVerifyRequestDto)                       │    │    │
+│  │  │  • jwtSign(JWTSignatureRequestDto)                                 │    │    │
+│  │  │  • jwtVerify(JWTSignatureVerifyRequestDto)                         │    │    │
+│  │  │  • coseSign1(COSESign1RequestDto)                                  │    │    │
+│  │  │  • signBinary(byte[], String, String)                              │    │    │
+│  │  │                                                                     │    │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘    │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    │    │
+│  │  │                    Business Logic                                  │    │    │
+│  │  │                                                                     │    │    │
+│  │  │  • Input Validation                                                │    │    │
+│  │  │  • Certificate Retrieval                                           │    │    │
+│  │  │  • Signature Generation/Verification                               │    │    │
+│  │  │  • Trust Validation                                                │    │    │
+│  │  │  • Error Handling                                                  │    │    │
+│  │  │                                                                     │    │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘    │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Call KeymanagerService
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                         KEYMANAGER SERVICE LAYER                                   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                     KeymanagerService                                      │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    │    │
+│  │  │                  Certificate Management                             │    │    │
+│  │  │                                                                     │    │    │
+│  │  │  • getSignatureCertificate(applicationId, referenceId, timestamp)  │    │    │
+│  │  │  • Certificate Validation                                          │    │    │
+│  │  │  • Key Access Control                                              │    │    │
+│  │  │  • Certificate Chain Management                                    │    │    │
+│  │  │                                                                     │    │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘    │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    │    │
+│  │  │                      Key Operations                                │    │    │
+│  │  │                                                                     │    │    │
+│  │  │  • Private Key Retrieval                                           │    │    │
+│  │  │  • Public Key Retrieval                                            │    │    │
+│  │  │  • Key Metadata Management                                         │    │    │
+│  │  │  • Key Lifecycle Management                                        │    │    │
+│  │  │                                                                     │    │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘    │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Access HSM/KeyStore
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           HSM/KEYSTORE LAYER                                       │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                    ECKeyStore / CryptoCore                                │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    │    │
+│  │  │                    HSM Operations                                  │    │    │
+│  │  │                                                                     │    │    │
+│  │  │  • Hardware Security Module Integration                            │    │    │
+│  │  │  • Secure Key Storage                                              │    │    │
+│  │  │  • Cryptographic Operations                                        │    │    │
+│  │  │  • Key Generation & Management                                     │    │    │
+│  │  │                                                                     │    │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘    │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────────────────────────────────────────────────────────┐    │    │
+│  │  │                   Algorithm Support                                │    │    │
+│  │  │                                                                     │    │    │
+│  │  │  • ES256 (ECDSA with P-256)                                       │    │    │
+│  │  │  • RS256 (RSA with SHA-256)                                       │    │    │
+│  │  │  • PS256 (RSA-PSS with SHA-256)                                   │    │    │
+│  │  │  • Ed25519                                                         │    │    │
+│  │  │                                                                     │    │    │
+│  │  └─────────────────────────────────────────────────────────────────────┘    │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Return Certificate & Keys
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           CRYPTOGRAPHIC PROCESSING                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                    Signature Generation/Verification                      │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │    │
+│  │  │   CBOR/COSE     │  │      JWT        │  │   Binary Data   │            │    │
+│  │  │   Operations    │  │   Operations    │  │   Operations    │            │    │
+│  │  │                 │  │                 │  │                 │            │    │
+│  │  │• COSE Sign1     │  │• JWT Creation   │  │• ECDSA Signing  │            │    │
+│  │  │• CBOR Encoding  │  │• Jose4j Library │  │• Base64 Encoding│            │    │
+│  │  │• SigStructure   │  │• Header/Payload │  │• HSM Integration│            │    │
+│  │  │• ES256 Signing  │  │• Signature      │  │• Key Retrieval  │            │    │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘            │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Return Signed Data
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                            RESPONSE DTO LAYER                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                        RESPONSE DTOs                                       │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │    │
+│  │  │CBORSignature    │  │JWTSignature     │  │COSESign1        │            │    │
+│  │  │ResponseDto      │  │ResponseDto      │  │ResponseDto      │            │    │
+│  │  │                 │  │                 │  │                 │            │    │
+│  │  │• cborSignedData │  │• jwtSignedData  │  │• coseSign1Data  │            │    │
+│  │  │• timestamp      │  │• timestamp      │  │• timestamp      │            │    │
+│  │  │                 │  │                 │  │                 │            │    │
+│  │  │                 │  │                 │  │                 │            │    │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘            │    │
+│  │                                                                             │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │    │
+│  │  │CBORSignature    │  │VerifyBinary     │  │VerifyCredential │            │    │
+│  │  │VerifyResponseDto│  │ResponseDto      │  │ResponseDto      │            │    │
+│  │  │                 │  │                 │  │                 │            │    │
+│  │  │• signatureValid │  │• valid          │  │• valid          │            │    │
+│  │  │• message        │  │• message        │  │• message        │            │    │
+│  │  │• trustValid     │  │• timestamp      │  │• timestamp      │            │    │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘            │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ Wrap in ResponseWrapper
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           RESPONSE FLOW                                            │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐    │
+│  │                    ResponseWrapper<ResponseDto>                            │    │
+│  │                                                                             │    │
+│  │  • HTTP Status Code                                                        │    │
+│  │  • Response Metadata                                                       │    │
+│  │  • Response Data (DTO)                                                     │    │
+│  │  • Error Information (if any)                                              │    │
+│  │                                                                             │    │
+│  └─────────────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ HTTP Response
+        ▼
+[Client Application]
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              KEY FEATURES                                          │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+• LAYERED ARCHITECTURE: Clear separation of concerns
+• DTO PATTERN: Structured data transfer objects
+• DEPENDENCY INJECTION: Spring-based dependency management
+• COMPREHENSIVE LOGGING: Detailed audit trail
+• ERROR HANDLING: Robust exception management
+• SECURITY: Certificate validation and trust verification
+• MULTI-ALGORITHM SUPPORT: ES256, RS256, PS256, Ed25519
+• HSM INTEGRATION: Hardware security module support
+• VALIDATION: Input sanitization and certificate validation
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              DATA FLOW SUMMARY                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+1. CLIENT → HTTP Request with RequestWrapper<RequestDto>
+2. CONTROLLER → Validates input, unwraps DTO, delegates to service
+3. SERVICE → Business logic, calls KeymanagerService for certificates
+4. KEYMANAGER → Retrieves certificates and keys from HSM/KeyStore
+5. HSM/KEYSTORE → Provides secure cryptographic operations
+6. CRYPTO → Performs signature generation/verification
+7. SERVICE → Returns ResponseDto with signed data
+8. CONTROLLER → Wraps in ResponseWrapper, sends HTTP response
+9. CLIENT → Receives signed data or verification result

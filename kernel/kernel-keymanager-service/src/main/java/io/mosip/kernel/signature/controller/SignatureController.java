@@ -351,10 +351,26 @@ public ResponseWrapper<VerifyBinaryResponseDto> verifyBinary(
     @ApiOperation(value = "Sign a credential message using ECDSA", notes = "Signs a credential message using the HSM-backed key for the given application and reference ID.")
     public ResponseWrapper<io.mosip.kernel.signature.dto.SignatureResponseDto> signCredential(
             @RequestBody @Valid io.mosip.kernel.core.http.RequestWrapper<io.mosip.kernel.signature.dto.SignCredentialRequestDto> requestDto) {
-        io.mosip.kernel.signature.dto.SignatureResponseDto responseDto = service.signCredential(requestDto.getRequest());
-        io.mosip.kernel.core.http.ResponseWrapper<io.mosip.kernel.signature.dto.SignatureResponseDto> response = new io.mosip.kernel.core.http.ResponseWrapper<>();
-        response.setResponse(responseDto);
-        return response;
+        
+        String sessionId = SignatureConstant.SESSIONID;
+        LOGGER.info(sessionId, "SIGN_CREDENTIAL_CONTROLLER", SignatureConstant.BLANK,
+            "Received signCredential request. RequestId: {}, ApplicationId: {}", 
+            requestDto.getId(), requestDto.getRequest().getApplicationId());
+        
+        try {
+            io.mosip.kernel.signature.dto.SignatureResponseDto responseDto = service.signCredential(requestDto.getRequest());
+            io.mosip.kernel.core.http.ResponseWrapper<io.mosip.kernel.signature.dto.SignatureResponseDto> response = new io.mosip.kernel.core.http.ResponseWrapper<>();
+            response.setResponse(responseDto);
+            
+            LOGGER.info(sessionId, "SIGN_CREDENTIAL_CONTROLLER", SignatureConstant.BLANK,
+                "SignCredential request completed successfully");
+            
+            return response;
+        } catch (Exception e) {
+            LOGGER.error(sessionId, "SIGN_CREDENTIAL_CONTROLLER", SignatureConstant.BLANK,
+                "Exception in signCredential controller: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     @ResponseBody

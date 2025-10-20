@@ -2073,7 +2073,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			if (derSignature.length < SignatureConstant.MIN_DER_SIZE || derSignature.length > SignatureConstant.MAX_DER_SIZE) {
 				throw new SignatureFailureException(
 					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
-					"Invalid signature format: unexpected size " + derSignature.length);
+					"Invalid signature format: unexpected size " + derSignature.length,
+					null);
 			}
 			
 			return derSignature;
@@ -2096,7 +2097,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			if (rawSignature.length != SignatureConstant.P256_RAW_SIGNATURE_SIZE) { // 32 * 2 for P-256
 				throw new SignatureFailureException(
 					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
-					"Invalid raw signature length: expected " + SignatureConstant.P256_RAW_SIGNATURE_SIZE + ", got " + rawSignature.length);
+					"Invalid raw signature length: expected " + SignatureConstant.P256_RAW_SIGNATURE_SIZE + ", got " + rawSignature.length,
+					null);
 			}
 			
 			return rawSignature;

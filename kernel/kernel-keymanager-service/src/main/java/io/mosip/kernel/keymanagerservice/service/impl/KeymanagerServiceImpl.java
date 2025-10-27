@@ -169,6 +169,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 	static {
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name(), ECCurves.SECP256K1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name(), ECCurves.SECP256R1.name());
+		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name(), ECCurves.SECP256R1.name());
+		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name(), ECCurves.SECP256R1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.ED25519_SIGN.name(), ECCurves.ED25519.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name(), ECCurves.BRAINPOOLP256R1.name());
 	}
@@ -580,6 +582,18 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 	private KeyPairGenerateResponseDto generateKey(String responseObjectType, String appId, String refId,
 			Boolean forceFlag, KeyPairGenerateRequestDto request) {
 
+		// Prevent any automatic or forced key rotation for *all* EC curve (ECC) keys
+		boolean isEcCurveKey = Arrays.stream(KeyReferenceIdConsts.values())
+			.map(Enum::name)
+			.anyMatch(enumName -> enumName.startsWith("EC_") && enumName.equals(refId));
+		if (isEcCurveKey) {
+			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
+					"Automatic/forced key rotation is DISABLED for EC Curve key: " + refId);
+			KeyPairGenerateResponseDto responseDto = new KeyPairGenerateResponseDto();
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTime());
+			return responseDto;
+		}
+
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
 				"Generate Key for application ID: " + appId + ", RefId: " + refId + ", force flag: " + forceFlag.toString());
 		LocalDateTime timestamp = DateUtils.getUTCCurrentDateTime();
@@ -668,6 +682,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					(Arrays.stream(KeyReferenceIdConsts.values()).anyMatch((rId) -> rId.name().equals(refId)))) {
 			if (refId.equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name()) || 
 					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) || 
+					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name()) ||
 					refId.equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name()) ||
 					(refId.equals(KeyReferenceIdConsts.ED25519_SIGN.name()) && ed25519SupportFlag)) {
 				keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams, 

@@ -786,9 +786,25 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 				KeymanagerConstant.GET_CERTIFICATE);
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.REFERENCEID, refId.toString(),
 				KeymanagerConstant.GET_CERTIFICATE);
-		
+
 		LocalDateTime localDateTimeStamp = DateUtils.getUTCCurrentDateTime();
 		CertificateInfo<X509Certificate> certificateData = null;
+		String refidValue = refId.orElse("");
+		boolean isSecp256r1Family =
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+
+		// Retrieve aliases instead of triggering generation
+		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refidValue, localDateTimeStamp);
+		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
+		if (isSecp256r1Family && (currentKeyAlias == null || currentKeyAlias.isEmpty())) {
+			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.CURRENTKEYALIAS,
+				"No valid SECP256R1-family certificate found in getCertificate; auto-generation blocked!");
+			throw new KeymanagerServiceException(KeymanagerErrorConstant.KEY_GENERATION_NOT_DONE.getErrorCode(),
+				"Certificate unavailable; auto-generation is not allowed for EC_SECP256R1_SIGN(_*) via getCertificate. Please use the explicit key generation API.");
+		}
+		// If certificate does exist, use the present logic:
 		if (!refId.isPresent() || refId.get().trim().isEmpty()) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is not present. Will get Certificate from HSM");
@@ -808,7 +824,6 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					"Reference Id is present. Will get Certificate from DB store");
 			certificateData = getCertificateFromDBStore(appId, localDateTimeStamp, refId.get(), false);
 		}
-		
 		X509Certificate x509Cert = certificateData.getCertificate();
 		KeyPairGenerateResponseDto responseDto = new KeyPairGenerateResponseDto();
 		responseDto.setCertificate(keymanagerUtil.getPEMFormatedData(x509Cert));
@@ -1241,13 +1256,28 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 				KeymanagerConstant.ALL_GET_CERTIFICATES);
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.REFERENCEID, refId.toString(),
 				KeymanagerConstant.ALL_GET_CERTIFICATES);
-		
+
 		LocalDateTime localDateTimeStamp = DateUtils.getUTCCurrentDateTime();
+		String refidValue = refId.orElse("");
+		boolean isSecp256r1Family =
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refidValue, localDateTimeStamp);
+		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
+		if (isSecp256r1Family && (currentKeyAlias == null || currentKeyAlias.isEmpty())) {
+			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.CURRENTKEYALIAS,
+				"No valid SECP256R1-family certificates found in getAllCertificates; auto-generation blocked!");
+			throw new KeymanagerServiceException(KeymanagerErrorConstant.KEY_GENERATION_NOT_DONE.getErrorCode(),
+				"Certificates unavailable; auto-generation is not allowed for EC_SECP256R1_SIGN(_*) via getAllCertificates. Please use the explicit key generation API.");
+		}
+		// Use only present logic to retrieve whatever is there for non-blocked types
+		LocalDateTime time = localDateTimeStamp;
 		CertificateDataResponseDto[] certificateDataList = null;
 		if (!refId.isPresent() || refId.get().trim().isEmpty()) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is not present. Will get All Certificates from HSM");
-			certificateDataList = getAllCertificatesFromHSM(appId, localDateTimeStamp, KeymanagerConstant.EMPTY);
+			certificateDataList = getAllCertificatesFromHSM(appId, time, KeymanagerConstant.EMPTY);
 		} else if ((appId.equalsIgnoreCase(signApplicationid) && refId.isPresent()
 											&& refId.get().equals(certificateSignRefID)) || 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
@@ -1257,11 +1287,11 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 						 && ed25519SupportFlag)) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is present and it is " + refId.get() + " reference. Will get all certificates from HSM");
-			certificateDataList = getAllCertificatesFromHSM(appId, localDateTimeStamp, refId.get());
+			certificateDataList = getAllCertificatesFromHSM(appId, time, refId.get());
 		} else {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is present. Will get Certificate from DB store");
-			certificateDataList = getAllCertificatesFromDBStore(appId, localDateTimeStamp, refId.get());
+			certificateDataList = getAllCertificatesFromDBStore(appId, time, refId.get());
 		}
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Total Number of certificates found:" + certificateDataList.length);

@@ -589,14 +589,16 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 
 	private KeyPairGenerateResponseDto generateKey(String responseObjectType, String appId, String refId,
 			Boolean forceFlag, KeyPairGenerateRequestDto request) {
-
-		// Prevent any automatic or forced key rotation for *all* EC curve (ECC) keys
-		boolean isEcCurveKey = Arrays.stream(KeyReferenceIdConsts.values())
-			.map(Enum::name)
-			.anyMatch(enumName -> enumName.startsWith("EC_") && enumName.equals(refId));
-		if (isEcCurveKey) {
+		boolean isSecp256r1Family =
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+		LocalDateTime timestamp = DateUtils.getUTCCurrentDateTime();
+		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refId, timestamp);
+		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
+		if (isSecp256r1Family && !currentKeyAlias.isEmpty()) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
-					"Automatic/forced key rotation is DISABLED for EC Curve key: " + refId);
+					"Automatic/forced key rotation is DISABLED for SECP256R1 family key: " + refId);
 			KeyPairGenerateResponseDto responseDto = new KeyPairGenerateResponseDto();
 			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTime());
 			return responseDto;
@@ -604,9 +606,6 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
 				"Generate Key for application ID: " + appId + ", RefId: " + refId + ", force flag: " + forceFlag.toString());
-		LocalDateTime timestamp = DateUtils.getUTCCurrentDateTime();
-		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refId, timestamp);
-		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
 		if (forceFlag) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId, 
 					"Force Flag is True, invalidating all the existing keys and generating new key pair.");

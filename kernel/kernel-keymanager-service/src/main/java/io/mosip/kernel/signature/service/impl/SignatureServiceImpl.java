@@ -215,6 +215,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		JWT_SIGNATURE_ALGO_IDENT.put(SignatureConstant.REF_ID_SIGN_CONST, AlgorithmIdentifiers.RSA_USING_SHA256);
 		JWT_SIGNATURE_ALGO_IDENT.put(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name(), AlgorithmIdentifiers.ECDSA_USING_SECP256K1_CURVE_AND_SHA256);
 		JWT_SIGNATURE_ALGO_IDENT.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name(), AlgorithmIdentifiers.ECDSA_USING_P256_CURVE_AND_SHA256);
+		JWT_SIGNATURE_ALGO_IDENT.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name(), AlgorithmIdentifiers.ECDSA_USING_P256_CURVE_AND_SHA256);
+		JWT_SIGNATURE_ALGO_IDENT.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name(), AlgorithmIdentifiers.ECDSA_USING_P256_CURVE_AND_SHA256);
 		JWT_SIGNATURE_ALGO_IDENT.put(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name(), "ES256-BRAINPOOL");
 		JWT_SIGNATURE_ALGO_IDENT.put(KeyReferenceIdConsts.ED25519_SIGN.name(), AlgorithmIdentifiers.EDDSA);
 	}

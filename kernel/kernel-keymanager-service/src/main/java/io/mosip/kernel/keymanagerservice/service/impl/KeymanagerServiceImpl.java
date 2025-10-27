@@ -491,10 +491,18 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			expiryDateTime = fetchedKeyAlias.getKeyExpiryTime();
 			uniqueIdentifier = fetchedKeyAlias.getUniqueIdentifier();
 		} else if (currentKeyAlias.isEmpty() && keyAlias.size() > 0) {
-			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.KEYALIAS,
-						keyAlias.get(0).getAlias(),
-					"CurrentKeyAlias size is zero. Key got expired, generating new keypair using this App Id & Ref Id");
-			// This will generate the new key in HSM.
+			if (refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) {
+				LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.KEYALIAS,
+							keyAlias.get(0).getAlias(),
+							"CurrentKeyAlias size is zero. Key got expired. NO AUTO-GENERATION for SECP256R1 keys in getSigningCertificate.");
+				throw new KeymanagerServiceException(
+					KeymanagerErrorConstant.KEY_GENERATION_NOT_DONE.getErrorCode(),
+					"No valid certificate available; auto-generation is not allowed for EC_SECP256R1_SIGN(_*) via getSigningCertificate. Please use the explicit key generation API."
+				);
+			}
+			// For other key types, preserve the legacy behavior
 			alias = UUID.randomUUID().toString();
 			ImmutablePair<String, X509Certificate> immPair = generateKeyPairInHSM(alias, applicationId, refId, localDateTimeStamp, keyAlias);
 			certificateEntry = getCertificateEntry(alias, isPrivateRequired);

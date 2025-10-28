@@ -153,7 +153,7 @@ public class SignatureController {
     
 
     @ResponseBody
-    @PreAuthorize("hasAnyRole('fayda_cred_client')")
+   // @PreAuthorize("hasAnyRole('fayda_cred_client')")
     @PostMapping("/signCredential")
     @ApiOperation(value = "Sign a credential message using ECDSA", notes = "Signs a credential message using the HSM-backed key for the given application and reference ID.")
     public ResponseWrapper<io.mosip.kernel.signature.dto.SignatureResponseDto> signCredential(

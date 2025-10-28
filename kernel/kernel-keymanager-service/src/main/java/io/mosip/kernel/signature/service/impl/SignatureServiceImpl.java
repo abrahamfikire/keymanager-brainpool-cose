@@ -1720,7 +1720,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			// ===== SECURITY FIX 1: COMPREHENSIVE INPUT VALIDATION =====
 			validateInputParameters(requestDto);
 			
-			String message = requestDto.getMessage();
+			String base64Message = requestDto.getMessage();
 			String applicationId = requestDto.getApplicationId();
 			String referenceId = requestDto.getReferenceId();
 			String timestamp = DateUtils.getUTCCurrentDateTimeString();
@@ -1775,8 +1775,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
 			
 			// ===== SECURITY FIX 5: SAFE SIGNATURE GENERATION =====
-			// Convert string message to UTF-8 bytes
-			byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
+			byte[] messageBytes = Base64.decodeBase64(base64Message);
 			byte[] signature = generateSecureSignature(messageBytes, privateKey, providerName);
 			
 			// ===== SECURITY FIX 6: SAFE SIGNATURE CONVERSION =====
@@ -1820,7 +1819,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 	@Override
 	public boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto) {
-		String message = requestDto.getMessage();
+		String base64Message = requestDto.getMessage();
 		String signatureBase64 = requestDto.getSignature();
 		String applicationId = requestDto.getApplicationId();
 		String referenceId = requestDto.getReferenceId();
@@ -1829,14 +1828,15 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		java.security.PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
 		String providerName = certificateResponse.getProviderName();
 		try {
-			// Use UTF-8 encoding for the message (not Base64 decoding)
-			byte[] messageBytes = message.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+			// Decode base64 to binary bytes
+			byte[] messageBytes = Base64.decodeBase64(base64Message);
 			byte[] signatureBytes = org.apache.commons.codec.binary.Base64.decodeBase64(signatureBase64);
 			signatureBytes = rawToDer(signatureBytes); // <-- Add this line
+			
 			// Verify the binary data directly
-			java.security.Signature signature = (providerName != null && !providerName.isEmpty())
-					? java.security.Signature.getInstance("SHA256withECDSA", providerName)
-					: java.security.Signature.getInstance("SHA256withECDSA");
+			Signature signature = (providerName != null && !providerName.isEmpty())
+					? Signature.getInstance("SHA256withECDSA", providerName)
+					: Signature.getInstance("SHA256withECDSA");
 			signature.initVerify(publicKey);
 			signature.update(messageBytes);
 			return signature.verify(signatureBytes);
@@ -1979,10 +1979,15 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				"Message cannot be null or empty");
 		}
 
-		// Validate message size (1MB limit for UTF-8 encoded bytes)
-		String message = requestDto.getMessage();
-		byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-		if (messageBytes.length > SignatureConstant.MAX_MESSAGE_SIZE) {
+		// Validate Base64 format
+		String base64Message = requestDto.getMessage();
+		if (!isValidBase64(base64Message)) {
+			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
+				"Invalid Base64 format in message");
+		}
+
+		// Validate message size (1MB limit)
+		if (base64Message.length() > SignatureConstant.MAX_MESSAGE_SIZE) {
 			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
 				"Message size exceeds maximum allowed limit of 1MB");
 		}

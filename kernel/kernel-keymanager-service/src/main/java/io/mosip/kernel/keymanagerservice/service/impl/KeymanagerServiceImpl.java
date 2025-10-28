@@ -1362,43 +1362,54 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 
 	@Override
 	public JwksResponseDto getJwksForAppRef(String applicationId, String referenceId) {
-		AllCertificatesDataResponseDto allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(referenceId));
+		AllCertificatesDataResponseDto allCerts;
 		List<JwksResponseDto.JwkKeyDto> keys = new ArrayList<>();
-		if (allCerts != null && allCerts.getAllCertificates() != null) {
-			for (var certDto : allCerts.getAllCertificates()) {
-				try {
-					String pem = certDto.getCertificateData();
-					String base64 = pem
-						.replace("-----BEGIN CERTIFICATE-----", "")
-						.replace("-----END CERTIFICATE-----", "")
-						.replaceAll("\\s+", "");
-					byte[] der = Base64.getDecoder().decode(base64);
-					X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
-						.generateCertificate(new java.io.ByteArrayInputStream(der));
-					PublicKey pubKey = cert.getPublicKey();
-					System.out.println("Cert Subject: " + cert.getSubjectDN());
-					System.out.println("Key type: " + pubKey.getAlgorithm() + ", class: " + pubKey.getClass());
-					if (!(pubKey instanceof ECPublicKey)) {
-						System.out.println("Skipping non-EC key");
-						continue;
+
+		// Support wildcard suffix '*' to fetch all refs with given prefix
+		List<String> refIdsToFetch;
+		if (referenceId != null && referenceId.endsWith("*")) {
+			String prefix = referenceId.substring(0, referenceId.length() - 1);
+			refIdsToFetch = new ArrayList<>();
+			for (KeyReferenceIdConsts v : KeyReferenceIdConsts.values()) {
+				String name = v.name();
+				if (name.startsWith(prefix)) {
+					refIdsToFetch.add(name);
+				}
+			}
+		} else {
+			refIdsToFetch = Collections.singletonList(referenceId);
+		}
+
+		for (String ref : refIdsToFetch) {
+			allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(ref));
+			if (allCerts != null && allCerts.getAllCertificates() != null) {
+				for (var certDto : allCerts.getAllCertificates()) {
+					try {
+						String pem = certDto.getCertificateData();
+						String base64 = pem
+							.replace("-----BEGIN CERTIFICATE-----", "")
+							.replace("-----END CERTIFICATE-----", "")
+							.replaceAll("\\s+", "");
+						byte[] der = java.util.Base64.getDecoder().decode(base64);
+						X509Certificate cert = (X509Certificate) java.security.cert.CertificateFactory.getInstance("X.509")
+							.generateCertificate(new java.io.ByteArrayInputStream(der));
+						PublicKey pubKey = cert.getPublicKey();
+						if (!(pubKey instanceof java.security.interfaces.ECPublicKey)) {
+							continue;
+						}
+						java.security.interfaces.ECPublicKey ecKey = (java.security.interfaces.ECPublicKey) cert.getPublicKey();
+						String x = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
+						String y = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineY().toByteArray());
+						String crv = getCrvFromParams(ecKey.getParams());
+						String x5c = java.util.Base64.getEncoder().encodeToString(cert.getEncoded());
+						String kid = certDto.getKeyId();
+						String alg = "ES256";
+						String kty = "EC";
+						JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, java.util.Collections.singletonList(x5c), y);
+						keys.add(jwk);
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
-					ECPublicKey ecKey = (ECPublicKey) cert.getPublicKey();
-					// x, y as base64url
-					String x = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
-					String y = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineY().toByteArray());
-					// crv
-					String crv = getCrvFromParams(ecKey.getParams());
-					// x5c: DER base64
-					String x5c = Base64.getEncoder().encodeToString(cert.getEncoded());
-					// kid: use keyId or SHA-1 thumbprint
-					String kid = certDto.getKeyId();
-					// alg/kty
-					String alg = "ES256";
-					String kty = "EC";
-					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, Collections.singletonList(x5c),y);
-					keys.add(jwk);
-				} catch (Exception e) {
-					e.printStackTrace();
 				}
 			}
 		}

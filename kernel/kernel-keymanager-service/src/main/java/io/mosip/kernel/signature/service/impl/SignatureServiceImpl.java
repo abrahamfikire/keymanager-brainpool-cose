@@ -1720,7 +1720,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			// ===== SECURITY FIX 1: COMPREHENSIVE INPUT VALIDATION =====
 			validateInputParameters(requestDto);
 			
-			String base64Message = requestDto.getMessage();
+			String message = requestDto.getMessage();
 			String applicationId = requestDto.getApplicationId();
 			String referenceId = requestDto.getReferenceId();
 			String timestamp = DateUtils.getUTCCurrentDateTimeString();
@@ -1775,7 +1775,8 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			String keyId = SignatureUtil.convertHexToBase64(certificateResponse.getUniqueIdentifier());
 			
 			// ===== SECURITY FIX 5: SAFE SIGNATURE GENERATION =====
-			byte[] messageBytes = Base64.decodeBase64(base64Message);
+			// Convert string message to UTF-8 bytes
+			byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
 			byte[] signature = generateSecureSignature(messageBytes, privateKey, providerName);
 			
 			// ===== SECURITY FIX 6: SAFE SIGNATURE CONVERSION =====
@@ -1979,15 +1980,10 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				"Message cannot be null or empty");
 		}
 
-		// Validate Base64 format
-		String base64Message = requestDto.getMessage();
-		if (!isValidBase64(base64Message)) {
-			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
-				"Invalid Base64 format in message");
-		}
-
-		// Validate message size (1MB limit)
-		if (base64Message.length() > SignatureConstant.MAX_MESSAGE_SIZE) {
+		// Validate message size (1MB limit for UTF-8 encoded bytes)
+		String message = requestDto.getMessage();
+		byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
+		if (messageBytes.length > SignatureConstant.MAX_MESSAGE_SIZE) {
 			throw new RequestException(SignatureErrorCode.INVALID_INPUT.getErrorCode(),
 				"Message size exceeds maximum allowed limit of 1MB");
 		}

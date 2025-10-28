@@ -1381,7 +1381,12 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		}
 
 		for (String ref : refIdsToFetch) {
-			allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(ref));
+			try {
+				allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(ref));
+			} catch (KeymanagerServiceException ex) {
+				// Skip refs that intentionally block auto-generation or are unavailable
+				continue;
+			}
 			if (allCerts != null && allCerts.getAllCertificates() != null) {
 				for (var certDto : allCerts.getAllCertificates()) {
 					try {

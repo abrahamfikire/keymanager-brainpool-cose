@@ -1729,13 +1729,43 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			validateAccessControl(applicationId);
 
 			// ===== SECURITY FIX 3: CERTIFICATE VALIDATION =====
-			SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(
-				applicationId, Optional.of(referenceId), timestamp);
-			
-			// CRITICAL: Add missing certificate validation
-			keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), 
-				DateUtils.parseUTCToDate(timestamp));
-			
+			SignatureCertificate certificateResponse = null;
+			java.util.List<String> candidateRefs = new java.util.ArrayList<>();
+			if (KeyReferenceIdConsts.EC_SECP256R1_SIGN.name().equals(referenceId)
+					|| KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name().equals(referenceId)
+					|| KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name().equals(referenceId)) {
+				// Prefer PRIMERY, then SECONDARY
+				candidateRefs.add(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name());
+				candidateRefs.add(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+			} else {
+				candidateRefs.add(referenceId);
+			}
+
+			io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException lastKmEx = null;
+			for (String ref : candidateRefs) {
+				try {
+					certificateResponse = keymanagerService.getSignatureCertificate(
+						applicationId, Optional.of(ref), timestamp);
+					// validate certificate dates
+					keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(),
+							DateUtils.parseUTCToDate(timestamp));
+					// Found a valid certificate, use it
+					referenceId = ref;
+					break;
+				} catch (io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException e) {
+					lastKmEx = e;
+					certificateResponse = null;
+				} catch (Exception e) {
+					certificateResponse = null;
+				}
+			}
+			if (certificateResponse == null) {
+				throw new SignatureFailureException(
+						SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+						"No valid certificate available for signing (tried PRIMERY/SECONDARY if SECP256R1).",
+						lastKmEx);
+			}
+
 			PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 			String providerName = certificateResponse.getProviderName();
 

@@ -288,11 +288,11 @@ public class KeymanagerController {
      * No authentication required.
     //  */
 	@GetMapping(value = "/jwks", produces = "application/json")
-     public ResponseWrapper<JwksResponseDto> getJwks(
-             @RequestParam("applicationId") String applicationId,
-             @RequestParam(value = "referenceId", required = false) String referenceId) {
-         ResponseWrapper<JwksResponseDto> response = new ResponseWrapper<>();
-         response.setResponse(keymanagerService.getJwksForAppRef(applicationId, referenceId));
-       return response;
-     }
+    public ResponseWrapper<JwksResponseDto> getJwks(
+            @RequestParam("applicationId") String applicationId,
+            @RequestParam(value = "referenceId", required = false) String referenceId) {
+        ResponseWrapper<JwksResponseDto> response = new ResponseWrapper<>();
+        response.setResponse(keymanagerService.getJwksForAppRef(applicationId, referenceId));
+        return response;
+    }
 }

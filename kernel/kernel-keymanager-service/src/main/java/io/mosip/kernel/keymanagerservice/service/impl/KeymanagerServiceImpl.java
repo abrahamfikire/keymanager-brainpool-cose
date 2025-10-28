@@ -169,7 +169,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 	static {
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name(), ECCurves.SECP256K1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name(), ECCurves.SECP256R1.name());
-		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name(), ECCurves.SECP256R1.name());
+		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name(), ECCurves.SECP256R1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name(), ECCurves.SECP256R1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.ED25519_SIGN.name(), ECCurves.ED25519.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name(), ECCurves.BRAINPOOLP256R1.name());
@@ -492,7 +492,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			uniqueIdentifier = fetchedKeyAlias.getUniqueIdentifier();
 		} else if (currentKeyAlias.isEmpty() && keyAlias.size() > 0) {
 			if (refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
-				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
 				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) {
 				LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.KEYALIAS,
 							keyAlias.get(0).getAlias(),
@@ -591,7 +591,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			Boolean forceFlag, KeyPairGenerateRequestDto request) {
 		boolean isSecp256r1Family =
 				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
-				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
 				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
 		LocalDateTime timestamp = DateUtils.getUTCCurrentDateTime();
 		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refId, timestamp);
@@ -689,7 +689,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					(Arrays.stream(KeyReferenceIdConsts.values()).anyMatch((rId) -> rId.name().equals(refId)))) {
 			if (refId.equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name()) || 
 					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) || 
-					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
 					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name()) ||
 					refId.equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name()) ||
 					(refId.equals(KeyReferenceIdConsts.ED25519_SIGN.name()) && ed25519SupportFlag)) {
@@ -792,7 +792,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		String refidValue = refId.orElse("");
 		boolean isSecp256r1Family =
 			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
-			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
 			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
 
 		// Retrieve aliases instead of triggering generation
@@ -813,7 +813,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 						&& refId.get().equals(certificateSignRefID)) || 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name())) ||
-						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.ED25519_SIGN.name())
@@ -1263,7 +1263,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 		String refidValue = refId.orElse("");
 		boolean isSecp256r1Family =
 			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
-			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
 			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
 		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refidValue, localDateTimeStamp);
 		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
@@ -1284,7 +1284,7 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 											&& refId.get().equals(certificateSignRefID)) || 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name())) ||
-						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMERY.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.ED25519_SIGN.name())

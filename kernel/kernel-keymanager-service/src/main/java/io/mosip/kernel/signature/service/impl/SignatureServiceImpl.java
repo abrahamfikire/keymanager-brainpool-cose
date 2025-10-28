@@ -1820,7 +1820,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 	@Override
 	public boolean verifyCredential(io.mosip.kernel.signature.dto.VerifyCredentialRequestDto requestDto) {
-		String base64Message = requestDto.getMessage();
+		String message = requestDto.getMessage();
 		String signatureBase64 = requestDto.getSignature();
 		String applicationId = requestDto.getApplicationId();
 		String referenceId = requestDto.getReferenceId();
@@ -1829,15 +1829,14 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		java.security.PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
 		String providerName = certificateResponse.getProviderName();
 		try {
-			// Decode base64 to binary bytes
-			byte[] messageBytes = Base64.decodeBase64(base64Message);
+			// Use UTF-8 encoding for the message (not Base64 decoding)
+			byte[] messageBytes = message.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 			byte[] signatureBytes = org.apache.commons.codec.binary.Base64.decodeBase64(signatureBase64);
 			signatureBytes = rawToDer(signatureBytes); // <-- Add this line
-			
 			// Verify the binary data directly
-			Signature signature = (providerName != null && !providerName.isEmpty())
-					? Signature.getInstance("SHA256withECDSA", providerName)
-					: Signature.getInstance("SHA256withECDSA");
+			java.security.Signature signature = (providerName != null && !providerName.isEmpty())
+					? java.security.Signature.getInstance("SHA256withECDSA", providerName)
+					: java.security.Signature.getInstance("SHA256withECDSA");
 			signature.initVerify(publicKey);
 			signature.update(messageBytes);
 			return signature.verify(signatureBytes);

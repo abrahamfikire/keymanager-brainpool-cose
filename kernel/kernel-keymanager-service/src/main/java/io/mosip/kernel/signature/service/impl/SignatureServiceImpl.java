@@ -377,10 +377,41 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		String certificateUrl = SignatureUtil.isDataValid(
 				jwtSignRequestDto.getCertificateUrl()) ? jwtSignRequestDto.getCertificateUrl(): null;
 
-		SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId,
-				Optional.of(referenceId), timestamp);
-		keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(),
-				DateUtils.parseUTCToDate(timestamp));
+		// --- Start fallback logic for EC_SECP256R1_SIGN-family ---
+		SignatureCertificate certificateResponse = null;
+		java.util.List<String> candidateRefs = new java.util.ArrayList<>();
+		if (KeyReferenceIdConsts.EC_SECP256R1_SIGN.name().equals(referenceId)
+				|| KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name().equals(referenceId)
+				|| KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name().equals(referenceId)) {
+			candidateRefs.add(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name());
+			candidateRefs.add(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+		} else {
+			candidateRefs.add(referenceId);
+		}
+		io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException lastKmEx = null;
+		for (String ref : candidateRefs) {
+			try {
+				certificateResponse = keymanagerService.getSignatureCertificate(
+					applicationId, Optional.of(ref), timestamp);
+				keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(),
+						DateUtils.parseUTCToDate(timestamp));
+				referenceId = ref; // The key to be used for signing
+				break;
+			} catch (io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException e) {
+				lastKmEx = e;
+				certificateResponse = null;
+			} catch (Exception e) {
+				certificateResponse = null;
+			}
+		}
+		if (certificateResponse == null) {
+			throw new SignatureFailureException(
+					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+					"No valid certificate available for JWT signing (tried PRIMARY/SECONDARY if SECP256R1).",
+					lastKmEx);
+		}
+		// --- End fallback logic for EC_SECP256R1_SIGN-family ---
+
 		String signedData = sign(decodedDataToSign, certificateResponse, includePayload, includeCertificate,
 				includeCertHash, certificateUrl, referenceId);
 		JWTSignatureResponseDto responseDto = new JWTSignatureResponseDto();

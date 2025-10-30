@@ -1855,7 +1855,32 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		String applicationId = requestDto.getApplicationId();
 		String referenceId = requestDto.getReferenceId();
 		String timestamp = io.mosip.kernel.core.util.DateUtils.getUTCCurrentDateTimeString();
-		io.mosip.kernel.keymanagerservice.dto.SignatureCertificate certificateResponse = keymanagerService.getSignatureCertificate(applicationId, java.util.Optional.of(referenceId), timestamp);
+		io.mosip.kernel.keymanagerservice.dto.SignatureCertificate certificateResponse = null;
+		java.util.List<String> candidateRefs = new java.util.ArrayList<>();
+		if (KeyReferenceIdConsts.EC_SECP256R1_SIGN.name().equals(referenceId)
+				|| KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name().equals(referenceId)
+				|| KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name().equals(referenceId)) {
+			candidateRefs.add(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name());
+			candidateRefs.add(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+		} else {
+			candidateRefs.add(referenceId);
+		}
+		for (String ref : candidateRefs) {
+			try {
+				certificateResponse = keymanagerService.getSignatureCertificate(applicationId, java.util.Optional.of(ref), timestamp);
+				keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(), DateUtils.parseUTCToDate(timestamp));
+				referenceId = ref;
+				break;
+			} catch (Exception e) {
+				certificateResponse = null;
+			}
+		}
+		if (certificateResponse == null) {
+			throw new io.mosip.kernel.signature.exception.SignatureFailureException(
+				io.mosip.kernel.signature.constant.SignatureErrorCode.VERIFY_ERROR.getErrorCode(),
+				"No valid certificate available for verification (tried PRIMARY/SECONDARY if SECP256R1).",
+				null);
+		}
 		java.security.PublicKey publicKey = certificateResponse.getCertificateEntry().getChain()[0].getPublicKey();
 		String providerName = certificateResponse.getProviderName();
 		try {

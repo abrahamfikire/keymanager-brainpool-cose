@@ -109,11 +109,15 @@ import com.authlete.cwt.CWTClaimsSet;
 import com.authlete.cwt.CWTClaimsSetBuilder;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import java.util.Map;
 import java.util.Optional;
+import io.mosip.kernel.keymanagerservice.helper.KeymanagerDBHelper;
+import io.mosip.kernel.keymanagerservice.entity.KeyPolicy;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import com.authlete.cbor.CBORMalformedUtf8Exception;
@@ -196,6 +200,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 
 	@Autowired
 	ECKeyStore ecKeyStore;
+
+	@Autowired
+	KeymanagerDBHelper keymanagerDBHelper;
 
 	private static Map<String, SignatureProvider> SIGNATURE_PROVIDER = new HashMap<>();
 
@@ -1797,6 +1804,9 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 						lastKmEx);
 			}
 
+			// ===== SECURITY FIX 3.5: PRE-EXPIRY VALIDATION =====
+			validateCertificatePreExpiry(certificateResponse, applicationId, sessionId);
+
 			PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 			String providerName = certificateResponse.getProviderName();
 
@@ -2082,6 +2092,80 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 		if (!hasAccess) {
 			throw new RequestException(SignatureErrorCode.SIGN_NOT_ALLOWED.getErrorCode(),
 				SignatureErrorCode.SIGN_NOT_ALLOWED.getErrorMessage());
+		}
+	}
+
+	/**
+	 * SECURITY FIX 3.5: Pre-expiry validation
+	 * Validates that the certificate has sufficient validity remaining based on preExpireDays
+	 * from the KeyPolicy configuration. Prevents signing with certificates that expire too soon.
+	 */
+	private void validateCertificatePreExpiry(SignatureCertificate certificateResponse, 
+												String applicationId, String sessionId) {
+		try {
+			// Get KeyPolicy to retrieve preExpireDays
+			Optional<KeyPolicy> keyPolicyOpt = keymanagerDBHelper.getKeyPolicyFromCache(applicationId);
+			
+			if (!keyPolicyOpt.isPresent()) {
+				LOGGER.warn(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+					"KeyPolicy not found for applicationId: {}. Skipping pre-expiry validation.", applicationId);
+				return; // If no policy found, skip pre-expiry check (backward compatible)
+			}
+			
+			KeyPolicy keyPolicy = keyPolicyOpt.get();
+			int preExpireDays = keyPolicy.getPreExpireDays();
+			
+			// If preExpireDays is 0 or negative, skip pre-expiry check
+			if (preExpireDays <= 0) {
+				LOGGER.debug(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+					"Pre-expiry days is {} for applicationId: {}. Skipping pre-expiry validation.", 
+					preExpireDays, applicationId);
+				return;
+			}
+			
+			LocalDateTime certificateExpiry = certificateResponse.getExpiryAt();
+			if (certificateExpiry == null) {
+				LOGGER.warn(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+					"Certificate expiry date is null. Skipping pre-expiry validation.");
+				return;
+			}
+			
+			LocalDateTime now = DateUtils.getUTCCurrentDateTime();
+			long daysUntilExpiry = ChronoUnit.DAYS.between(now, certificateExpiry);
+			
+			LOGGER.debug(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+				"Certificate pre-expiry check: daysUntilExpiry={}, preExpireDays={}, applicationId={}", 
+				daysUntilExpiry, preExpireDays, applicationId);
+			
+			if (daysUntilExpiry < preExpireDays) {
+				LOGGER.error(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+					"Certificate expires in {} days, but pre-expiry period requires {} days remaining. " +
+					"Certificate expiry: {}, Current time: {}, ApplicationId: {}", 
+					daysUntilExpiry, preExpireDays, certificateExpiry, now, applicationId);
+				
+				throw new SignatureFailureException(
+					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
+					String.format("Certificate expires too soon. Remaining validity: %d days, " +
+								"but pre-expiry policy requires minimum %d days remaining. " +
+								"Please use a certificate with sufficient validity.",
+								daysUntilExpiry, preExpireDays),
+					null);
+			}
+			
+			LOGGER.debug(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+				"Pre-expiry validation passed. Certificate has {} days remaining (required: {} days)", 
+				daysUntilExpiry, preExpireDays);
+				
+		} catch (SignatureFailureException e) {
+			// Re-throw SignatureFailureException as-is
+			throw e;
+		} catch (Exception e) {
+			// Log warning but don't fail signing if pre-expiry check encounters unexpected errors
+			// This ensures backward compatibility if KeyPolicy is unavailable
+			LOGGER.warn(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+				"Error during pre-expiry validation for applicationId: {}. Error: {}. " +
+				"Continuing with signing (backward compatibility).", 
+				applicationId, e.getMessage(), e);
 		}
 	}
 

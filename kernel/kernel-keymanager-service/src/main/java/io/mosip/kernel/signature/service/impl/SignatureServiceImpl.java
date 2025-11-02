@@ -1780,6 +1780,7 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			}
 
 			io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException lastKmEx = null;
+			SignatureFailureException lastPreExpiryEx = null;
 			for (String ref : candidateRefs) {
 				try {
 					certificateResponse = keymanagerService.getSignatureCertificate(
@@ -1787,7 +1788,22 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 					// validate certificate dates
 					keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(),
 							DateUtils.parseUTCToDate(timestamp));
-					// Found a valid certificate, use it
+					
+					// ===== SECURITY FIX 3.5: PRE-EXPIRY VALIDATION =====
+					// Check pre-expiry for this candidate certificate
+					try {
+						validateCertificatePreExpiry(certificateResponse, applicationId, sessionId);
+					} catch (SignatureFailureException preExpiryEx) {
+						// Certificate fails pre-expiry check, try next candidate
+						LOGGER.warn(sessionId, "SIGN_CREDENTIAL", SignatureConstant.BLANK,
+							"Certificate for referenceId {} failed pre-expiry validation: {}. Trying next candidate.",
+							ref, preExpiryEx.getMessage());
+						lastPreExpiryEx = preExpiryEx;
+						certificateResponse = null;
+						continue; // Try next candidate
+					}
+					
+					// Found a valid certificate that also passes pre-expiry, use it
 					referenceId = ref;
 					break;
 				} catch (io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException e) {
@@ -1798,14 +1814,17 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 				}
 			}
 			if (certificateResponse == null) {
+				// Prefer pre-expiry exception message if available (more specific)
+				Exception causeException = lastPreExpiryEx != null ? lastPreExpiryEx : lastKmEx;
+				String errorMessage = lastPreExpiryEx != null 
+					? String.format("No valid certificate available for signing. All candidates failed pre-expiry validation. Last error: %s", 
+									lastPreExpiryEx.getMessage())
+					: "No valid certificate available for signing (tried PRIMARY/SECONDARY if SECP256R1).";
 				throw new SignatureFailureException(
 						SignatureErrorCode.SIGN_ERROR.getErrorCode(),
-						"No valid certificate available for signing (tried PRIMERY/SECONDARY if SECP256R1).",
-						lastKmEx);
+						errorMessage,
+						causeException);
 			}
-
-			// ===== SECURITY FIX 3.5: PRE-EXPIRY VALIDATION =====
-			validateCertificatePreExpiry(certificateResponse, applicationId, sessionId);
 
 			PrivateKey privateKey = certificateResponse.getCertificateEntry().getPrivateKey();
 			String providerName = certificateResponse.getProviderName();

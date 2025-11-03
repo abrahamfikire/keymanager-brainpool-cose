@@ -396,13 +396,26 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			candidateRefs.add(referenceId);
 		}
 		io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException lastKmEx = null;
+		SignatureFailureException lastPreExpiryEx = null;
 		for (String ref : candidateRefs) {
 			try {
 				certificateResponse = keymanagerService.getSignatureCertificate(
 					applicationId, Optional.of(ref), timestamp);
+				// X.509 date validation
 				keymanagerUtil.isCertificateValid(certificateResponse.getCertificateEntry(),
 						DateUtils.parseUTCToDate(timestamp));
-				referenceId = ref; // The key to be used for signing
+				// Pre-expiry validation (same policy as signCredential)
+				try {
+					validateCertificatePreExpiry(certificateResponse, applicationId, SignatureConstant.SESSIONID);
+				} catch (SignatureFailureException preExpiryEx) {
+					LOGGER.warn(SignatureConstant.SESSIONID, SignatureConstant.JWT_SIGN, SignatureConstant.BLANK,
+							"Certificate for referenceId {} failed pre-expiry validation: {}. Trying next candidate.",
+							ref, preExpiryEx.getMessage());
+					lastPreExpiryEx = preExpiryEx;
+					certificateResponse = null;
+					continue;
+				}
+				referenceId = ref; // Selected candidate
 				break;
 			} catch (io.mosip.kernel.keymanagerservice.exception.KeymanagerServiceException e) {
 				lastKmEx = e;
@@ -412,10 +425,15 @@ public class SignatureServiceImpl implements SignatureService, SignatureServicev
 			}
 		}
 		if (certificateResponse == null) {
+			Exception causeException = lastPreExpiryEx != null ? lastPreExpiryEx : lastKmEx;
+			String errorMessage = lastPreExpiryEx != null 
+				? String.format("No valid certificate available for JWT signing. All candidates failed pre-expiry validation. Last error: %s", 
+							lastPreExpiryEx.getMessage())
+				: "No valid certificate available for JWT signing (tried PRIMARY/SECONDARY if SECP256R1).";
 			throw new SignatureFailureException(
 					SignatureErrorCode.SIGN_ERROR.getErrorCode(),
-					"No valid certificate available for JWT signing (tried PRIMARY/SECONDARY if SECP256R1).",
-					lastKmEx);
+					errorMessage,
+					causeException);
 		}
 		// --- End fallback logic for EC_SECP256R1_SIGN-family ---
 

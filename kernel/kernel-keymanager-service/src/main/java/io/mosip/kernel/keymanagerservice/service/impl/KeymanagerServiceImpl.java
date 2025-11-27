@@ -1384,8 +1384,38 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			try {
 				allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(ref));
 			} catch (KeymanagerServiceException ex) {
-				// Skip refs that intentionally block auto-generation or are unavailable
-				continue;
+				// If getAllCertificates fails due to no active keys, still try to fetch expired certificates
+				// This is important for JWKS to return all certificates (including expired) for verification
+				// IMPORTANT: This is READ-ONLY - no automatic key generation or rotation happens here
+				LOGGER.warn(KeymanagerConstant.SESSIONID, "JWKS", KeymanagerConstant.EMPTY,
+					"getAllCertificates failed for ref {} (likely no active keys). Attempting to fetch expired certificates directly (READ-ONLY): {}",
+					ref, ex.getMessage());
+				try {
+					// Directly fetch all certificates (including expired) from KEYALIAS
+					// READ-ONLY operation: getAllCertificatesFromHSM/DBStore only read existing certificates, no generation
+					LocalDateTime timeStamp = DateUtils.getUTCCurrentDateTime();
+					boolean isSecp256r1Family = ref.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+						ref.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+						ref.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+					
+					if (isSecp256r1Family || 
+						ref.equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name()) ||
+						ref.equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name()) ||
+						(ref.equals(KeyReferenceIdConsts.ED25519_SIGN.name()) && ed25519SupportFlag)) {
+						CertificateDataResponseDto[] certArray = getAllCertificatesFromHSM(applicationId, timeStamp, ref);
+						allCerts = new AllCertificatesDataResponseDto();
+						allCerts.setAllCertificates(certArray);
+					} else {
+						CertificateDataResponseDto[] certArray = getAllCertificatesFromDBStore(applicationId, timeStamp, ref);
+						allCerts = new AllCertificatesDataResponseDto();
+						allCerts.setAllCertificates(certArray);
+					}
+				} catch (Exception fallbackEx) {
+					LOGGER.warn(KeymanagerConstant.SESSIONID, "JWKS", KeymanagerConstant.EMPTY,
+						"Failed to fetch expired certificates for ref {}: {}. Skipping this ref.",
+						ref, fallbackEx.getMessage());
+					continue;
+				}
 			}
 			if (allCerts != null && allCerts.getAllCertificates() != null) {
 				for (var certDto : allCerts.getAllCertificates()) {

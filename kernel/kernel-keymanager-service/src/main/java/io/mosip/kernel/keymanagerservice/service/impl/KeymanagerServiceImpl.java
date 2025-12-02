@@ -859,6 +859,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 							&& refId.get().equals(certificateSignRefID))|| 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.ED25519_SIGN.name())
 						 && ed25519SupportFlag)) {

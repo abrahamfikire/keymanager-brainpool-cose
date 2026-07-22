@@ -287,12 +287,12 @@ public class KeymanagerController {
      * JWKS endpoint: Returns JSON Web Key Set for all certificates for the given app/ref.
      * No authentication required.
     //  */
-	// @GetMapping(value = "/jwks", produces = "application/json")
-    // public ResponseWrapper<JwksResponseDto> getJwks(
-    //         @RequestParam("applicationId") String applicationId,
-    //         @RequestParam(value = "referenceId", required = false) String referenceId) {
-    //     ResponseWrapper<JwksResponseDto> response = new ResponseWrapper<>();
-    //     response.setResponse(keymanagerService.getJwksForAppRef(applicationId, referenceId));
-    //     return response;
-    // }
+	@GetMapping(value = "/jwks", produces = "application/json")
+    public ResponseWrapper<JwksResponseDto> getJwks(
+            @RequestParam("applicationId") String applicationId,
+            @RequestParam(value = "referenceId", required = false) String referenceId) {
+        ResponseWrapper<JwksResponseDto> response = new ResponseWrapper<>();
+        response.setResponse(keymanagerService.getJwksForAppRef(applicationId, referenceId));
+        return response;
+    }
 }

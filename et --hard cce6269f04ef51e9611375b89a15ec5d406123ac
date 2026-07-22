@@ -1,0 +1,299 @@
+[33mcommit 6628f0362cdce438b3f04e48ddb45b2c8aecf136[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelopment[m[33m, [m[1;31morigin/keymanager-qrcodegenerator[m[33m, [m[1;32mkeymanager-qrcodegenerator[m[33m)[m
+Author: Your Name <you@example.com>
+Date:   Sat Aug 2 20:43:52 2025 +0300
+
+    keymanager and qrcode imlemententation
+
+[33mcommit cce6269f04ef51e9611375b89a15ec5d406123ac[m[33m ([m[1;31morigin/development[m[33m)[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 31 14:23:22 2025 +0300
+
+    jwks disabled
+
+[33mcommit b2f0a086d27f9c200adc17b18887e1df434cdd48[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 31 11:44:09 2025 +0300
+
+    added raw to der
+
+[33mcommit 727651ef794be64ab530826d999d4ea01820fb02[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 31 11:24:28 2025 +0300
+
+    added raw to der
+
+[33mcommit 0092f9d2fff8389516e0a374575503482893310b[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 31 10:42:02 2025 +0300
+
+    binary
+
+[33mcommit 9b91a3d6dc01c7e8790cf07bc27e8db05aacea16[m
+Author: Your Name <you@example.com>
+Date:   Wed Jul 30 17:19:07 2025 +0300
+
+    NATIONAL_ID_SECURITY_TECHNICAL_PLAN.md added
+
+[33mcommit 2acc302e685632d9982df60fd99d88af6a075083[m
+Author: Your Name <you@example.com>
+Date:   Wed Jul 30 11:12:36 2025 +0300
+
+    plans and reports added
+
+[33mcommit 2de91ab46e32976e9817453943e26f1409a5854b[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 12:32:36 2025 +0300
+
+    reorder jwks output
+
+[33mcommit ed41e39092cd65b9326359465a3846ca92fae926[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 12:21:39 2025 +0300
+
+    eccurve key generation when it is expired
+
+[33mcommit 13ef2862ef809bd6b7e4495b507ba22815856086[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 11:45:13 2025 +0300
+
+    white space changed
+
+[33mcommit 459bac8a7c42cb77a4ce0414701b003e273eab47[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 11:39:01 2025 +0300
+
+    loggers
+
+[33mcommit 3c067a139a55b6ff1dd3679b3099db5150993185[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 10:36:22 2025 +0300
+
+    jwks keymanager controler
+
+[33mcommit f0bfc5408da50d17ae45cebe398e3e8cc499d9d5[m
+Merge: f5b95c4 5cdc26a
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 10:19:05 2025 +0300
+
+    jwks add
+
+[33mcommit 5cdc26a0b0dc9eb6411114905c01b6d6a5dc28d1[m
+Author: btkash2011@gmail.com <`%qm%:ziiab\^guj&>
+Date:   Thu Jul 24 09:52:42 2025 +0300
+
+    jwks added
+
+[33mcommit f5b95c44531595188df4c9920da80dd5d735acbc[m
+Author: Your Name <you@example.com>
+Date:   Thu Jul 24 09:17:33 2025 +0300
+
+    fdsf
+
+[33mcommit ebe6de2560e5893f6a3172bf35f023b776fb06b1[m
+Author: Your Name <you@example.com>
+Date:   Wed Jul 23 15:25:12 2025 +0300
+
+    uniqeidentifierundent
+
+[33mcommit 5343538693db787ec71dd093ba784e133f90e2d0[m
+Author: Your Name <you@example.com>
+Date:   Wed Jul 23 12:25:57 2025 +0300
+
+    ec-keygeneration after expired
+
+[33mcommit 51d37452a404dbe8715b5d48602702a4f7fc4593[m
+Author: Your Name <you@example.com>
+Date:   Wed Jul 23 10:26:44 2025 +0300
+
+    add loggers
+
+[33mcommit 817e876a58cf43f4d6c97d062a9167176a92eebd[m
+Author: Your Name <you@example.com>
+Date:   Tue Jul 22 15:30:30 2025 +0300
+
+    derToraw
+
+[33mcommit 1299c055965159c502d7015b48a6efcc96c993bc[m
+Author: Your Name <you@example.com>
+Date:   Mon Jul 21 14:29:31 2025 +0300
+
+    signcredential kid header
+
+[33mcommit c41b7e084377705adc52ed2ecb432aafe7c95878[m[33m ([m[1;31morigin/pretest[m[33m)[m
+Merge: e6bf08e 0871e13
+Author: abrahamfikire <abrahamfikire@gmail.com>
+Date:   Fri Jul 18 13:43:35 2025 +0300
+
+    Merge pull request #1 from abrahamfikire/development
+    
+    Development
+
+[33mcommit 0871e13839f56d897ac3974ddb5c464c1eccf776[m
+Author: Your Name <you@example.com>
+Date:   Fri Jul 18 13:20:21 2025 +0300
+
+    base 64 byte
+
+[33mcommit b11473e0203251a42e75517420015c880e7ecc10[m
+Author: Your Name <you@example.com>
+Date:   Fri Jul 18 12:38:02 2025 +0300
+
+    certificateResponse.getUniqueIdentifier
+
+[33mcommit dfb57a031f70aae4fd0bf9a7b6ce1c3d6cd5e5a9[m[33m ([m[1;32mfeature/credential-sign-verify[m[33m)[m
+Author: Your Name <you@example.com>
+Date:   Tue Jul 15 11:19:44 2025 +0300
+
+    raw sign
+
+[33mcommit 05001a3c14ed7f5017b9320cb7516cdbab3ce6e8[m
+Author: Your Name <you@example.com>
+Date:   Tue Jul 15 10:55:57 2025 +0300
+
+    raw sign
+
+[33mcommit 9337d892495abf09822d8a60fd933ada029758cd[m
+Author: Your Name <you@example.com>
+Date:   Tue Jul 15 09:12:33 2025 +0300
+
+    fdfdfdf
+
+[33mcommit d5aee91753cb81bf368dd88955aeb81a79c2e5ee[m
+Author: Your Name <you@example.com>
+Date:   Tue Jul 15 00:10:08 2025 +0300
+
+    raw sign and verify
+
+[33mcommit 3503f6c66c2c90789078011982398044a3ee2b7c[m
+Author: Your Name <you@example.com>
+Date:   Tue Jul 15 00:01:17 2025 +0300
+
+    raw sign and verify
+
+[33mcommit e6bf08e4e835c90b17e9b07d25b78ba2f8931604[m
+Author: Your Name <you@example.com>
+Date:   Mon Jul 14 16:10:39 2025 +0300
+
+    der to raw converted for hsm
+
+[33mcommit bd2c606fd165aded0c27a9fda379eb57b2e95608[m
+Author: Your Name <you@example.com>
+Date:   Mon Jul 14 16:08:35 2025 +0300
+
+    der to raw converted for hsm
+
+[33mcommit fa48e05881cb07eb656f29c4aa7c6800f5c459e4[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 16:34:55 2025 +0300
+
+    fdfd
+
+[33mcommit 6593fda3817d1516d2cd99c14f323ed790677743[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 15:12:12 2025 +0300
+
+    dffd
+
+[33mcommit 3f345cbbf813c3a775b5b693244bd86c32d2cccc[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 15:04:27 2025 +0300
+
+    dffd
+
+[33mcommit 802812887b895eec1908631d63e2b7b1fbf50e99[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 14:36:16 2025 +0300
+
+    luna provicder
+
+[33mcommit 50df7d410b00ac91f581fb5443e4e27742006675[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 13:56:29 2025 +0300
+
+    dfd
+
+[33mcommit 21cba93c7823ab1da99c95a54018cb30b3d52913[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 13:47:00 2025 +0300
+
+    dfd
+
+[33mcommit 8089aaac657730c7f7a37f80ee800fd69b55994c[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 13:32:46 2025 +0300
+
+    dfd
+
+[33mcommit 173f70f175d4e202a73b0b005ac60f64a96b2d44[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 12:59:34 2025 +0300
+
+    dfs
+
+[33mcommit 56f5b9beeb1bdce0c57fdf274a4d09d0fb84eff8[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 12:14:21 2025 +0300
+
+    pkcs
+
+[33mcommit 0c8e633d7ac2f910d9e1d14d6932203cc6862279[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 11:44:43 2025 +0300
+
+    trustvalidation
+
+[33mcommit 715baf2e7a2a39ae84c0211806b76e1c606a8307[m
+Author: Your Name <you@example.com>
+Date:   Sat Jul 12 11:32:45 2025 +0300
+
+    dsfs
+
+[33mcommit 10977c16874ac57936e0771fb7860dd50b85689c[m
+Author: baq <baq@baq.baq>
+Date:   Sat Jul 12 09:52:29 2025 +0300
+
+    cose privatekey
+
+[33mcommit 777667b84c182e0bef8568c26a7d3f823bb52d44[m
+Author: baq <baq@baq.baq>
+Date:   Sat Jul 12 09:45:43 2025 +0300
+
+    logging cbor erros
+
+[33mcommit 51623fd00dbb8227e41c8f3a60cf1aa1a016ddb2[m
+Author: baq <baq@baq.baq>
+Date:   Sat Jul 12 09:14:43 2025 +0300
+
+    cbor
+
+[33mcommit 44e27655d9b348965a11a131bd1b57f1e79f90c8[m
+Author: baq <baq@baq.baq>
+Date:   Fri Jul 11 09:13:41 2025 +0300
+
+    Add comprehensive README with usage examples
+
+[33mcommit 211343b10a363810a9cf98237d279f2623fb7417[m
+Author: baq <baq@baq.baq>
+Date:   Fri Jul 11 09:03:59 2025 +0300
+
+    Initial commit: MOSIP kernel-keymanager-service with CBOR/COSE signing support
+
+[33mcommit 6736d272a53907d5c70577f78040bea4dc2baef1[m
+Author: Keshav Mishra <chandrakeshavmishra@gmail.com>
+Date:   Sun Jul 2 13:11:38 2023 +0530
+
+    Updated Pom versions for release changes (#190)
+    
+    Co-authored-by: akilalakshmanan <akilalakshmanan@users.noreply.github.com>
+
+[33mcommit 9e5352473bcf86002d4c9df4c7496cb6de0a3a39[m
+Author: mahammedtaheer <57249563+mahammedtaheer@users.noreply.github.com>
+Date:   Mon May 8 16:24:03 2023 +0530
+
+    Upgraded pom version. (#171)
+
+[33mcommit 2776fa05a87a2ec975cfe83fde19042a0a23ec30[m
+Author: mahammedtaheer <57249563+mahammedtaheer@users.noreply.github.com>
+Date:   Thu May 4 12:45:11 2023 +0530
+
+    Cha

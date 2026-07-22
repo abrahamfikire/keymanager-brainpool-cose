@@ -169,6 +169,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 	static {
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name(), ECCurves.SECP256K1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name(), ECCurves.SECP256R1.name());
+		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name(), ECCurves.SECP256R1.name());
+		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name(), ECCurves.SECP256R1.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.ED25519_SIGN.name(), ECCurves.ED25519.name());
 		ecRefIdsAlgoNamesMap.put(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name(), ECCurves.BRAINPOOLP256R1.name());
 	}
@@ -489,10 +491,18 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 			expiryDateTime = fetchedKeyAlias.getKeyExpiryTime();
 			uniqueIdentifier = fetchedKeyAlias.getUniqueIdentifier();
 		} else if (currentKeyAlias.isEmpty() && keyAlias.size() > 0) {
-			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.KEYALIAS,
-						keyAlias.get(0).getAlias(),
-					"CurrentKeyAlias size is zero. Key got expired, generating new keypair using this App Id & Ref Id");
-			// This will generate the new key in HSM.
+			if (refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) {
+				LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.KEYALIAS,
+							keyAlias.get(0).getAlias(),
+							"CurrentKeyAlias size is zero. Key got expired. NO AUTO-GENERATION for SECP256R1 keys in getSigningCertificate.");
+				throw new KeymanagerServiceException(
+					KeymanagerErrorConstant.KEY_GENERATION_NOT_DONE.getErrorCode(),
+					"No valid certificate available; auto-generation is not allowed for EC_SECP256R1_SIGN(_*) via getSigningCertificate. Please use the explicit key generation API."
+				);
+			}
+			// For other key types, preserve the legacy behavior
 			alias = UUID.randomUUID().toString();
 			ImmutablePair<String, X509Certificate> immPair = generateKeyPairInHSM(alias, applicationId, refId, localDateTimeStamp, keyAlias);
 			certificateEntry = getCertificateEntry(alias, isPrivateRequired);
@@ -579,12 +589,23 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 
 	private KeyPairGenerateResponseDto generateKey(String responseObjectType, String appId, String refId,
 			Boolean forceFlag, KeyPairGenerateRequestDto request) {
-
-		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
-				"Generate Key for application ID: " + appId + ", RefId: " + refId + ", force flag: " + forceFlag.toString());
+		boolean isSecp256r1Family =
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+				refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
 		LocalDateTime timestamp = DateUtils.getUTCCurrentDateTime();
 		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refId, timestamp);
 		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
+		if (isSecp256r1Family && !currentKeyAlias.isEmpty()) {
+			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
+					"Automatic/forced key rotation is DISABLED for SECP256R1 family key: " + refId);
+			KeyPairGenerateResponseDto responseDto = new KeyPairGenerateResponseDto();
+			responseDto.setTimestamp(DateUtils.getUTCCurrentDateTime());
+			return responseDto;
+		}
+
+		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId,
+				"Generate Key for application ID: " + appId + ", RefId: " + refId + ", force flag: " + forceFlag.toString());
 		if (forceFlag) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.APPLICATIONID, appId, 
 					"Force Flag is True, invalidating all the existing keys and generating new key pair.");
@@ -668,6 +689,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					(Arrays.stream(KeyReferenceIdConsts.values()).anyMatch((rId) -> rId.name().equals(refId)))) {
 			if (refId.equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name()) || 
 					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) || 
+					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+					refId.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name()) ||
 					refId.equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name()) ||
 					(refId.equals(KeyReferenceIdConsts.ED25519_SIGN.name()) && ed25519SupportFlag)) {
 				keyStore.generateAndStoreAsymmetricKey(alias, rootKeyAlias, certParams, 
@@ -763,9 +786,25 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 				KeymanagerConstant.GET_CERTIFICATE);
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.REFERENCEID, refId.toString(),
 				KeymanagerConstant.GET_CERTIFICATE);
-		
+
 		LocalDateTime localDateTimeStamp = DateUtils.getUTCCurrentDateTime();
 		CertificateInfo<X509Certificate> certificateData = null;
+		String refidValue = refId.orElse("");
+		boolean isSecp256r1Family =
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+
+		// Retrieve aliases instead of triggering generation
+		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refidValue, localDateTimeStamp);
+		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
+		if (isSecp256r1Family && (currentKeyAlias == null || currentKeyAlias.isEmpty())) {
+			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.CURRENTKEYALIAS,
+				"No valid SECP256R1-family certificate found in getCertificate; auto-generation blocked!");
+			throw new KeymanagerServiceException(KeymanagerErrorConstant.KEY_GENERATION_NOT_DONE.getErrorCode(),
+				"Certificate unavailable; auto-generation is not allowed for EC_SECP256R1_SIGN(_*) via getCertificate. Please use the explicit key generation API.");
+		}
+		// If certificate does exist, use the present logic:
 		if (!refId.isPresent() || refId.get().trim().isEmpty()) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is not present. Will get Certificate from HSM");
@@ -774,6 +813,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 						&& refId.get().equals(certificateSignRefID)) || 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.ED25519_SIGN.name())
 						 && ed25519SupportFlag)) {
@@ -785,7 +826,6 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 					"Reference Id is present. Will get Certificate from DB store");
 			certificateData = getCertificateFromDBStore(appId, localDateTimeStamp, refId.get(), false);
 		}
-		
 		X509Certificate x509Cert = certificateData.getCertificate();
 		KeyPairGenerateResponseDto responseDto = new KeyPairGenerateResponseDto();
 		responseDto.setCertificate(keymanagerUtil.getPEMFormatedData(x509Cert));
@@ -819,6 +859,8 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 							&& refId.get().equals(certificateSignRefID))|| 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.ED25519_SIGN.name())
 						 && ed25519SupportFlag)) {
@@ -1218,27 +1260,44 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 				KeymanagerConstant.ALL_GET_CERTIFICATES);
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.REFERENCEID, refId.toString(),
 				KeymanagerConstant.ALL_GET_CERTIFICATES);
-		
+
 		LocalDateTime localDateTimeStamp = DateUtils.getUTCCurrentDateTime();
+		String refidValue = refId.orElse("");
+		boolean isSecp256r1Family =
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+			refidValue.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+		Map<String, List<KeyAlias>> keyAliasMap = dbHelper.getKeyAliases(appId, refidValue, localDateTimeStamp);
+		List<KeyAlias> currentKeyAlias = keyAliasMap.get(KeymanagerConstant.CURRENTKEYALIAS);
+		if (isSecp256r1Family && (currentKeyAlias == null || currentKeyAlias.isEmpty())) {
+			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.CURRENTKEYALIAS,
+				"No valid SECP256R1-family certificates found in getAllCertificates; auto-generation blocked!");
+			throw new KeymanagerServiceException(KeymanagerErrorConstant.KEY_GENERATION_NOT_DONE.getErrorCode(),
+				"Certificates unavailable; auto-generation is not allowed for EC_SECP256R1_SIGN(_*) via getAllCertificates. Please use the explicit key generation API.");
+		}
+		// Use only present logic to retrieve whatever is there for non-blocked types
+		LocalDateTime time = localDateTimeStamp;
 		CertificateDataResponseDto[] certificateDataList = null;
 		if (!refId.isPresent() || refId.get().trim().isEmpty()) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is not present. Will get All Certificates from HSM");
-			certificateDataList = getAllCertificatesFromHSM(appId, localDateTimeStamp, KeymanagerConstant.EMPTY);
+			certificateDataList = getAllCertificatesFromHSM(appId, time, KeymanagerConstant.EMPTY);
 		} else if ((appId.equalsIgnoreCase(signApplicationid) && refId.isPresent()
 											&& refId.get().equals(certificateSignRefID)) || 
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name())) ||
+						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name())) ||
 						(refId.isPresent() && refId.get().equals(KeyReferenceIdConsts.ED25519_SIGN.name())
 						 && ed25519SupportFlag)) {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is present and it is " + refId.get() + " reference. Will get all certificates from HSM");
-			certificateDataList = getAllCertificatesFromHSM(appId, localDateTimeStamp, refId.get());
+			certificateDataList = getAllCertificatesFromHSM(appId, time, refId.get());
 		} else {
 			LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Reference Id is present. Will get Certificate from DB store");
-			certificateDataList = getAllCertificatesFromDBStore(appId, localDateTimeStamp, refId.get());
+			certificateDataList = getAllCertificatesFromDBStore(appId, time, refId.get());
 		}
 		LOGGER.info(KeymanagerConstant.SESSIONID, KeymanagerConstant.EMPTY, KeymanagerConstant.EMPTY,
 					"Total Number of certificates found:" + certificateDataList.length);
@@ -1305,43 +1364,89 @@ public class KeymanagerServiceImpl implements KeymanagerService {
 
 	@Override
 	public JwksResponseDto getJwksForAppRef(String applicationId, String referenceId) {
-		AllCertificatesDataResponseDto allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(referenceId));
+		AllCertificatesDataResponseDto allCerts;
 		List<JwksResponseDto.JwkKeyDto> keys = new ArrayList<>();
-		if (allCerts != null && allCerts.getAllCertificates() != null) {
-			for (var certDto : allCerts.getAllCertificates()) {
+
+		// Support wildcard suffix '*' to fetch all refs with given prefix
+		List<String> refIdsToFetch;
+		if (referenceId != null && referenceId.endsWith("*")) {
+			String prefix = referenceId.substring(0, referenceId.length() - 1);
+			refIdsToFetch = new ArrayList<>();
+			for (KeyReferenceIdConsts v : KeyReferenceIdConsts.values()) {
+				String name = v.name();
+				if (name.startsWith(prefix)) {
+					refIdsToFetch.add(name);
+				}
+			}
+		} else {
+			refIdsToFetch = Collections.singletonList(referenceId);
+		}
+
+		for (String ref : refIdsToFetch) {
+			try {
+				allCerts = getAllCertificates(applicationId, java.util.Optional.ofNullable(ref));
+			} catch (KeymanagerServiceException ex) {
+				// If getAllCertificates fails due to no active keys, still try to fetch expired certificates
+				// This is important for JWKS to return all certificates (including expired) for verification
+				// IMPORTANT: This is READ-ONLY - no automatic key generation or rotation happens here
+				LOGGER.warn(KeymanagerConstant.SESSIONID, "JWKS", KeymanagerConstant.EMPTY,
+					"getAllCertificates failed for ref {} (likely no active keys). Attempting to fetch expired certificates directly (READ-ONLY): {}",
+					ref, ex.getMessage());
 				try {
-					String pem = certDto.getCertificateData();
-					String base64 = pem
-						.replace("-----BEGIN CERTIFICATE-----", "")
-						.replace("-----END CERTIFICATE-----", "")
-						.replaceAll("\\s+", "");
-					byte[] der = Base64.getDecoder().decode(base64);
-					X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
-						.generateCertificate(new java.io.ByteArrayInputStream(der));
-					PublicKey pubKey = cert.getPublicKey();
-					System.out.println("Cert Subject: " + cert.getSubjectDN());
-					System.out.println("Key type: " + pubKey.getAlgorithm() + ", class: " + pubKey.getClass());
-					if (!(pubKey instanceof ECPublicKey)) {
-						System.out.println("Skipping non-EC key");
-						continue;
+					// Directly fetch all certificates (including expired) from KEYALIAS
+					// READ-ONLY operation: getAllCertificatesFromHSM/DBStore only read existing certificates, no generation
+					LocalDateTime timeStamp = DateUtils.getUTCCurrentDateTime();
+					boolean isSecp256r1Family = ref.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN.name()) ||
+						ref.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_PRIMARY.name()) ||
+						ref.equals(KeyReferenceIdConsts.EC_SECP256R1_SIGN_SECONDARY.name());
+					
+					if (isSecp256r1Family || 
+						ref.equals(KeyReferenceIdConsts.EC_SECP256K1_SIGN.name()) ||
+						ref.equals(KeyReferenceIdConsts.EC_BRAINPOOLP256R1_SIGN.name()) ||
+						(ref.equals(KeyReferenceIdConsts.ED25519_SIGN.name()) && ed25519SupportFlag)) {
+						CertificateDataResponseDto[] certArray = getAllCertificatesFromHSM(applicationId, timeStamp, ref);
+						allCerts = new AllCertificatesDataResponseDto();
+						allCerts.setAllCertificates(certArray);
+					} else {
+						CertificateDataResponseDto[] certArray = getAllCertificatesFromDBStore(applicationId, timeStamp, ref);
+						allCerts = new AllCertificatesDataResponseDto();
+						allCerts.setAllCertificates(certArray);
 					}
-					ECPublicKey ecKey = (ECPublicKey) cert.getPublicKey();
-					// x, y as base64url
-					String x = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
-					String y = Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineY().toByteArray());
-					// crv
-					String crv = getCrvFromParams(ecKey.getParams());
-					// x5c: DER base64
-					String x5c = Base64.getEncoder().encodeToString(cert.getEncoded());
-					// kid: use keyId or SHA-1 thumbprint
-					String kid = certDto.getKeyId();
-					// alg/kty
-					String alg = "ES256";
-					String kty = "EC";
-					JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, Collections.singletonList(x5c),y);
-					keys.add(jwk);
-				} catch (Exception e) {
-					e.printStackTrace();
+				} catch (Exception fallbackEx) {
+					LOGGER.warn(KeymanagerConstant.SESSIONID, "JWKS", KeymanagerConstant.EMPTY,
+						"Failed to fetch expired certificates for ref {}: {}. Skipping this ref.",
+						ref, fallbackEx.getMessage());
+					continue;
+				}
+			}
+			if (allCerts != null && allCerts.getAllCertificates() != null) {
+				for (var certDto : allCerts.getAllCertificates()) {
+					try {
+						String pem = certDto.getCertificateData();
+						String base64 = pem
+							.replace("-----BEGIN CERTIFICATE-----", "")
+							.replace("-----END CERTIFICATE-----", "")
+							.replaceAll("\\s+", "");
+						byte[] der = java.util.Base64.getDecoder().decode(base64);
+						X509Certificate cert = (X509Certificate) java.security.cert.CertificateFactory.getInstance("X.509")
+							.generateCertificate(new java.io.ByteArrayInputStream(der));
+						PublicKey pubKey = cert.getPublicKey();
+						if (!(pubKey instanceof java.security.interfaces.ECPublicKey)) {
+							continue;
+						}
+						java.security.interfaces.ECPublicKey ecKey = (java.security.interfaces.ECPublicKey) cert.getPublicKey();
+						String x = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineX().toByteArray());
+						String y = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(ecKey.getW().getAffineY().toByteArray());
+						String crv = getCrvFromParams(ecKey.getParams());
+						String x5c = java.util.Base64.getEncoder().encodeToString(cert.getEncoded());
+						String kid = certDto.getKeyId();
+						String alg = "ES256";
+						String kty = "EC";
+						JwksResponseDto.JwkKeyDto jwk = new JwksResponseDto.JwkKeyDto(alg, crv, kid, kty, x, java.util.Collections.singletonList(x5c), y);
+						keys.add(jwk);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
